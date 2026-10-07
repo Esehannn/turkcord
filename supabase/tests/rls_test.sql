@@ -375,6 +375,23 @@ select tests.topic('online');
 set role authenticated;
 select tests.ok((select count(*) = 1 from realtime.messages where topic = realtime.topic()), 'giriş yapan herkes çevrimiçi listesini görebilir');
 
+-- Ses sinyalleri
+reset role;
+insert into realtime.messages (topic, extension, payload) values ('ses:' || :'ses_id', 'broadcast', '{"t":"teklif"}');
+select tests.login(:'veli');
+select tests.topic('ses:' || :'ses_id');
+set role authenticated;
+select tests.ok((select count(*) = 1 from realtime.messages where topic = realtime.topic()), 'üye ses sinyallerini alabilir');
+insert into realtime.messages (topic, extension) values ('ses:' || :'ses_id', 'broadcast');
+
+reset role;
+select tests.login(:'mehmet');
+set role authenticated;
+select tests.ok((select count(*) = 0 from realtime.messages where topic = realtime.topic()), 'üye olmayan ses sinyallerini alamaz');
+select tests.fails(
+  format('insert into realtime.messages (topic, extension) values (%L, %L)', 'ses:' || :'ses_id', 'broadcast'),
+  'üye olmayan ses sinyali gönderemez', 'row-level security');
+
 reset role;
 set role anon;
 select tests.fails($$select count(*) from realtime.messages$$, 'giriş yapmamış biri kanallara erişemez', 'permission denied');

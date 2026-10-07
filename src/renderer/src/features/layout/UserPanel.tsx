@@ -1,9 +1,11 @@
 import { useState } from 'react'
-import { Settings } from 'lucide-react'
+import { Headphones, HeadphoneOff, Mic, MicOff, Settings } from 'lucide-react'
 import { Avatar, StatusDot } from '@/components/Avatar'
 import { IconButton } from '@/components/ui'
 import { useProfile } from '@/data/queries'
 import { useUi, type PresenceStatus } from '@/stores/ui'
+import { setDeafened, setMuted } from '@/voice/engine'
+import { useVoice } from '@/voice/store'
 
 const STATUS_OPTIONS: { value: PresenceStatus; label: string; hint: string; dot: 'online' | 'idle' | 'dnd' | 'offline' }[] = [
   { value: 'online', label: 'Çevrimiçi', hint: 'Herkes seni çevrimiçi görür', dot: 'online' },
@@ -18,12 +20,14 @@ export function UserPanel({ userId }: { userId: string }) {
   const setPrefs = useUi((s) => s.setPrefs)
   const openModal = useUi((s) => s.openModal)
   const [menuOpen, setMenuOpen] = useState(false)
+  const muted = useVoice((s) => s.muted)
+  const deafened = useVoice((s) => s.deafened)
 
   if (!profile) return null
   const current = STATUS_OPTIONS.find((o) => o.value === status) ?? STATUS_OPTIONS[0]
 
   return (
-    <div className="relative flex h-14 items-center gap-2 border-t border-line bg-sidebar px-2">
+    <div className="relative flex h-14 items-center gap-1 border-t border-line bg-sidebar px-2">
       <button
         type="button"
         onClick={() => setMenuOpen((v) => !v)}
@@ -36,9 +40,25 @@ export function UserPanel({ userId }: { userId: string }) {
           <span className="block truncate text-xs text-muted">{profile.custom_status || current.label}</span>
         </span>
       </button>
+      <div className="flex">
+        <IconButton
+          label={muted || deafened ? 'Mikrofonu aç' : 'Mikrofonu kapat'}
+          className={muted || deafened ? 'text-accent hover:text-accent' : ''}
+          onClick={() => setMuted(!(muted || deafened))}
+        >
+          {muted || deafened ? <MicOff className="size-[18px]" /> : <Mic className="size-[18px]" />}
+        </IconButton>
+        <IconButton
+          label={deafened ? 'Sesi aç' : 'Sağırlaştır (kimseyi duyma)'}
+          className={deafened ? 'text-accent hover:text-accent' : ''}
+          onClick={() => setDeafened(!deafened)}
+        >
+          {deafened ? <HeadphoneOff className="size-[18px]" /> : <Headphones className="size-[18px]" />}
+        </IconButton>
       <IconButton label="Ayarlar" onClick={() => openModal({ kind: 'settings' })}>
         <Settings className="size-[18px]" />
       </IconButton>
+      </div>
 
       {menuOpen && (
         <>

@@ -12,6 +12,8 @@ import { ServerSidebar } from '@/features/servers/ServerSidebar'
 import { ModalHost } from './ModalHost'
 import { ServerRail } from './ServerRail'
 import { UserPanel } from './UserPanel'
+import { VoicePanel } from '@/features/voice/VoicePanel'
+import { leaveVoice } from '@/voice/engine'
 import { EmptyState } from '@/components/ui'
 import { Hash } from 'lucide-react'
 
@@ -24,6 +26,9 @@ export function MainLayout({ userId }: { userId: string }) {
   const view = useUi((s) => s.view)
   const setView = useUi((s) => s.setView)
   const memberList = useUi((s) => s.memberList)
+
+  // Oturum kapanınca ses kanalından da çık.
+  useEffect(() => () => void leaveVoice(false), [])
 
   // Bildirim izni bir kez istenir (Windows'ta genelde otomatik verilir).
   useEffect(() => {
@@ -52,6 +57,7 @@ export function MainLayout({ userId }: { userId: string }) {
       <ServerRail />
       <aside className="flex w-60 shrink-0 flex-col bg-sidebar">
         <div className="min-h-0 flex-1">{view.kind === 'server' ? <ServerSidebar serverId={view.serverId} /> : <HomeSidebar />}</div>
+        <VoicePanel />
         <UserPanel userId={userId} />
       </aside>
       <main className="flex min-w-0 flex-1 bg-chat">

@@ -49,7 +49,23 @@ Uygulamada **Kayıt Ol** ekranında bu kodu kullan. Sonraki davet kodlarını uy
 2. `package.json`'daki sürümü artır, `v0.1.0` gibi bir etiket gönder ya da **Actions → Sürüm → Run workflow** de.
 3. Kurulum dosyası **Releases** sayfasına yüklenir.
 
-## 5. Güvenlik önerileri
+## 5. Sesli sohbet için Cloudflare TURN (isteğe bağlı ama önerilir)
+
+Sesli sohbet bilgisayarlar arasında doğrudan (P2P) bağlanır. Bazı hatlarda (mobil hotspot, bazı fiber/CGNAT
+bağlantılar) doğrudan bağlantı kurulamaz; o zaman ses Cloudflare'in TURN sunucusu üzerinden aktarılır.
+Ücretsiz kota ayda 1.000 GB'dır; arkadaş grubu için fazlasıyla yeter. Tanımlanmazsa sadece doğrudan bağlantı denenir.
+
+1. [dash.cloudflare.com](https://dash.cloudflare.com) → sol menüde **Realtime** → **TURN Server** → **Create**.
+2. Bir ad ver (ör. `turkcord`). Oluşunca iki değer gösterilir: **Turn Token ID** ve **API Token**.
+   API Token sadece bir kez gösterilir; hemen bir sonraki adıma geç.
+3. Supabase → **Edge Functions → Secrets** (Manage secrets) → iki gizli değer ekle:
+   - `CLOUDFLARE_TURN_KEY_ID` = Turn Token ID
+   - `CLOUDFLARE_TURN_API_TOKEN` = API Token
+4. Kaydet. Uygulama bir sonraki ses bağlantısında TURN bilgisini `turn` fonksiyonundan alır.
+
+Bu değerler gizlidir: repoya, sohbete ya da uygulamaya yazılmaz; sadece Supabase'te durur.
+
+## 6. Güvenlik önerileri
 
 - Repo herkese açıksa **Settings → Code security** altında *Secret scanning* ve *Push protection*'ı aç.
 - `main` dalı için **Settings → Branches** altında koruma kuralı ekle (doğrudan push yerine PR).

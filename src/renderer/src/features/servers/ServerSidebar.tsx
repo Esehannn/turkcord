@@ -6,7 +6,9 @@ import { useActions } from '@/data/actions'
 import { useChannels, useMembers, useServers, useUnread } from '@/data/queries'
 import type { ChannelRow } from '@/lib/database.types'
 import { useSession } from '@/stores/session'
-import { toast } from '@/stores/toast'
+import { joinVoice } from '@/voice/engine'
+import { useVoice } from '@/voice/store'
+import { VoiceRoom } from '@/features/voice/VoiceRoom'
 import { useUi } from '@/stores/ui'
 import { rememberChannel } from '@/features/layout/ServerRail'
 
@@ -22,6 +24,7 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
   const openModal = useUi((s) => s.openModal)
   const actions = useActions()
   const [menuOpen, setMenuOpen] = useState(false)
+  const voiceChannel = useVoice((s) => (s.status !== 'idle' ? s.channelId : null))
 
   const role = members.find((m) => m.user_id === me)?.role ?? 'member'
   const canManage = role === 'owner' || role === 'admin'
@@ -134,16 +137,18 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
         </ChannelGroup>
         <ChannelGroup title="Ses kanalları" canAdd={canManage} onAdd={() => openModal({ kind: 'create-channel', serverId })}>
           {voice.map((c) => (
-            <ChannelButton
-              key={c.id}
-              channel={c}
-              active={false}
-              unread={false}
-              mentions={0}
-              canManage={canManage}
-              onClick={() => toast.info('Sesli sohbet bir sonraki aşamada geliyor. 🎧')}
-              onSettings={() => openModal({ kind: 'channel-settings', channelId: c.id })}
-            />
+            <div key={c.id}>
+              <ChannelButton
+                channel={c}
+                active={voiceChannel === c.id}
+                unread={false}
+                mentions={0}
+                canManage={canManage}
+                onClick={() => me && void joinVoice(serverId, c.id, me)}
+                onSettings={() => openModal({ kind: 'channel-settings', channelId: c.id })}
+              />
+              {me && <VoiceRoom channelId={c.id} me={me} />}
+            </div>
           ))}
         </ChannelGroup>
       </div>

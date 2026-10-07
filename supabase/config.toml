@@ -428,3 +428,7 @@ verify_jwt = false
 [functions.yonetici]
 enabled = true
 verify_jwt = false
+
+[functions.turn]
+enabled = true
+verify_jwt = false

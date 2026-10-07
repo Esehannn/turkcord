@@ -90,7 +90,7 @@ function hardenSession(): void {
   const ses = session.defaultSession
 
   // Sadece gerekli izinler: mikrofon (sesli sohbet), bildirimler, panoya yazma.
-  const allowed = new Set(['media', 'notifications', 'clipboard-sanitized-write', 'fullscreen'])
+  const allowed = new Set(['media', 'notifications', 'clipboard-sanitized-write', 'fullscreen', 'speaker-selection'])
   ses.setPermissionRequestHandler((webContents, permission, callback, details) => {
     const trusted = isTrustedUrl(webContents.getURL())
     if (permission === 'media') {

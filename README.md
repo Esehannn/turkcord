@@ -25,7 +25,7 @@ Sunucu tarafında [Supabase](https://supabase.com) kullanır ve ücretsiz planla
 | ✅ | Biçimlendirme (**kalın**, *italik*, `kod`, spoiler), @etiketleme, "yazıyor…" göstergesi |
 | ✅ | Okunmamış rozetleri, masaüstü bildirimleri, açık ve koyu tema |
 | ✅ | Yönetici paneli: davet kodları, şifre sıfırlama, hesap askıya alma |
-| 🔜 | Sesli sohbet (P2P WebRTC) |
+| ✅ | Sesli sohbet: P2P WebRTC, konuşan göstergesi, susturma/sağırlaştırma, kişi başı ses ayarı, cihaz seçimi, gürültü ve yankı engelleme |
 | 🔜 | Otomatik güncelleme, sistem tepsisi |
 
 ## Arkadaşlar için kurulum

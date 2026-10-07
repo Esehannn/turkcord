@@ -1,6 +1,6 @@
 import { useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Bell, KeyRound, LogOut, Palette, ShieldCheck, User } from 'lucide-react'
+import { Bell, KeyRound, LogOut, Mic, Palette, ShieldCheck, User } from 'lucide-react'
 import { Avatar } from '@/components/Avatar'
 import { confirmDialog, Modal } from '@/components/Modal'
 import { Button, Field, Input } from '@/components/ui'
@@ -14,8 +14,9 @@ import { toast } from '@/stores/toast'
 import { useUi, type Theme } from '@/stores/ui'
 import { checkPassword, PASSWORD_MESSAGES } from '@shared/password'
 import { AdminPanel } from './AdminPanel'
+import { VoiceSettings } from './VoiceSettings'
 
-type Tab = 'profile' | 'appearance' | 'notifications' | 'account' | 'admin'
+type Tab = 'profile' | 'voice' | 'appearance' | 'notifications' | 'account' | 'admin'
 
 export function SettingsModal({ initialTab = 'profile', onClose }: { initialTab?: Tab; onClose: () => void }) {
   const me = useSession((s) => s.session?.user.id) ?? ''
@@ -24,6 +25,7 @@ export function SettingsModal({ initialTab = 'profile', onClose }: { initialTab?
 
   const tabs: { value: Tab; label: string; icon: typeof User; show: boolean }[] = [
     { value: 'profile', label: 'Profil', icon: User, show: true },
+    { value: 'voice', label: 'Ses ve Mikrofon', icon: Mic, show: true },
     { value: 'appearance', label: 'Görünüm', icon: Palette, show: true },
     { value: 'notifications', label: 'Bildirimler', icon: Bell, show: true },
     { value: 'account', label: 'Hesap', icon: KeyRound, show: true },
@@ -52,6 +54,7 @@ export function SettingsModal({ initialTab = 'profile', onClose }: { initialTab?
         </nav>
         <div className="min-w-0 flex-1">
           {tab === 'profile' && <ProfileTab userId={me} />}
+          {tab === 'voice' && <VoiceSettings />}
           {tab === 'appearance' && <AppearanceTab />}
           {tab === 'notifications' && <NotificationsTab />}
           {tab === 'account' && <AccountTab username={profile?.username ?? ''} onClose={onClose} />}

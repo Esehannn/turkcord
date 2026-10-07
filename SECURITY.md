@@ -31,6 +31,13 @@ Bir güvenlik açığı bulursan lütfen herkese açık bir issue açma. GitHub'
 - Davet kodu olmadan hangi kullanıcı adlarının alındığı yoklanamaz.
 - Şifre en az 8 karakter olmalı, harf ve rakam içermeli; yaygın şifreler ve kullanıcı adını içeren şifreler reddedilir.
 
+**Sesli sohbet**
+
+- Ses doğrudan katılımcılar arasında (P2P, WebRTC/DTLS-SRTP ile şifreli) akar; Supabase'ten geçmez.
+- Bağlantı bilgisi sadece o ses kanalının sunucusundaki üyeler arasında, korumalı Realtime kanalında paylaşılır.
+  P2P'nin doğası gereği aynı ses kanalındaki kişiler birbirinin IP adresini görebilir.
+- Cloudflare TURN bilgisi sunucu tarafında kısa ömürlü olarak üretilir; API anahtarı Supabase'in gizli ayarlarında durur.
+
 **Masaüstü uygulaması**
 
 - Pencere `contextIsolation`, `sandbox` açık ve `nodeIntegration` kapalı çalışır; arayüze sadece küçük bir köprü açılır.

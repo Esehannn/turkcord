@@ -15,7 +15,7 @@ export type Modal =
   | { kind: 'create-channel'; serverId: string }
   | { kind: 'channel-settings'; channelId: string }
   | { kind: 'server-settings'; serverId: string }
-  | { kind: 'settings'; tab?: 'profile' | 'appearance' | 'notifications' | 'account' | 'admin' }
+  | { kind: 'settings'; tab?: 'profile' | 'voice' | 'appearance' | 'notifications' | 'account' | 'admin' }
   | { kind: 'profile'; userId: string }
   | null
 
