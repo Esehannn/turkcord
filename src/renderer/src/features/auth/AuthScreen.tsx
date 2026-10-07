@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Logo, Wordmark } from '@/components/Logo'
 import { Button, Field, Input, Tabs } from '@/components/ui'
 import { errorMessage, functionErrorCode } from '@/lib/errors'
-import { getRememberMe, setRememberMe, supabase } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase'
 import { checkPassword, PASSWORD_MESSAGES } from '@shared/password'
 import { normalizeUsername, usernameProblem, usernameToEmail } from '@shared/username'
 
@@ -42,7 +42,6 @@ export function AuthScreen() {
 function LoginForm() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [remember, setRemember] = useState(getRememberMe)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -55,7 +54,6 @@ function LoginForm() {
       return
     }
     setBusy(true)
-    setRememberMe(remember)
     const { error } = await supabase.auth.signInWithPassword({ email: usernameToEmail(name), password })
     setBusy(false)
     if (error) setError(errorMessage(error))
@@ -69,7 +67,6 @@ function LoginForm() {
       <Field label="Şifre">
         <Input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
       </Field>
-      <RememberMe checked={remember} onChange={setRemember} />
       {error && <p className="text-sm text-accent">{error}</p>}
       <Button type="submit" loading={busy} className="w-full">
         Giriş Yap
@@ -85,7 +82,6 @@ function RegisterForm({ onDone }: { onDone: () => void }) {
   const [displayName, setDisplayName] = useState('')
   const [password, setPassword] = useState('')
   const [password2, setPassword2] = useState('')
-  const [remember, setRemember] = useState(getRememberMe)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [touched, setTouched] = useState(false)
@@ -113,7 +109,6 @@ function RegisterForm({ onDone }: { onDone: () => void }) {
       setError(errorMessage((await functionErrorCode(error)) ?? error))
       return
     }
-    setRememberMe(remember)
     const { error: loginError } = await supabase.auth.signInWithPassword({ email: usernameToEmail(name), password })
     setBusy(false)
     if (loginError) {
@@ -139,26 +134,11 @@ function RegisterForm({ onDone }: { onDone: () => void }) {
       <Field label="Şifre (tekrar)">
         <Input type="password" autoComplete="new-password" value={password2} onChange={(e) => setPassword2(e.target.value)} />
       </Field>
-      <RememberMe checked={remember} onChange={setRemember} />
       {error && <p className="text-sm text-accent">{error}</p>}
       <Button type="submit" loading={busy} className="w-full">
         Kayıt Ol
       </Button>
     </form>
-  )
-}
-
-function RememberMe({ checked, onChange }: { checked: boolean; onChange: (value: boolean) => void }) {
-  return (
-    <label className="flex cursor-pointer items-start gap-2.5 text-sm text-fg">
-      <input type="checkbox" className="mt-0.5 size-4 accent-[#e30a17]" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-      <span>
-        Beni hatırla
-        <span className="block text-xs text-faint">
-          {checked ? 'Uygulamayı kapatıp açınca tekrar giriş yapman gerekmez.' : 'Uygulama kapanınca oturumun kapanır (ortak bilgisayarlar için).'}
-        </span>
-      </span>
-    </label>
   )
 }
 

@@ -27,7 +27,23 @@ jobs:
           # Repo ayarları > Secrets and variables > Actions > Variables bölümünde tanımlanır.
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
-      - name: Kurulum dosyası oluştur ve yayınla
-        run: npx electron-builder --win --x64 --publish always
+      - name: Kurulum dosyası oluştur
+        run: npx electron-builder --win --x64 --publish never
+      # Sürüm sayfası ve etiketi GitHub CLI ile oluşturulur (etiket yoksa bu commit üzerinde açılır).
+      # Aynı sürüm tekrar derlenirse dosyalar güncellenir.
+      - name: Releases sayfasına yükle
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version=$(node -p "require('./package.json').version")
+          tag="v$version"
+          files=(release/Turkcord-Kurulum-*.exe release/Turkcord-Kurulum-*.exe.blockmap release/latest.yml)
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "${files[@]}" --clobber
+          else
+            gh release create "$tag" "${files[@]}" \
+              --target "$GITHUB_SHA" \
+              --title "Turkcord $version" \
+              --notes "Windows için kurulum dosyası: Turkcord-Kurulum-$version.exe. Kurarken Windows uyarı verirse 'Ek bilgi' ve ardından 'Yine de çalıştır' seçeneğine tıkla."
+          fi
