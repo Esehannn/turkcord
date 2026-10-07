@@ -47,3 +47,5 @@ Bir güvenlik açığı bulursan lütfen herkese açık bir issue açma. GitHub'
 - Oturum anahtarları Windows'un kullanıcıya özel şifrelemesiyle (DPAPI) korunan bir dosyada saklanır.
 - Electron Fuses ile `RunAsNode` gibi kötüye kullanılabilecek özellikler kapatılır ve asar bütünlüğü doğrulanır.
 - Mikrofon dışında kamera, konum gibi izinler reddedilir.
+- Güncellemeler sadece bu reponun GitHub Releases sayfasından (HTTPS) indirilir; kurulumdan önce dosyanın SHA-512
+  özeti `latest.yml` ile karşılaştırılır.

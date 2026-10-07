@@ -1,7 +1,7 @@
 {
   "name": "turkcord",
   "productName": "Turkcord",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Arkadaşlar arası sohbet uygulaması: sunucular, kanallar, DM ve sesli sohbet.",
   "author": "Turkcord",
   "homepage": "https://github.com/Esehannn/turkcord",
@@ -36,5 +36,8 @@
     "typescript": "~6.0.3",
     "vite": "^7.3.7",
     "zustand": "^5.0.15"
+  },
+  "dependencies": {
+    "electron-updater": "6.8.10"
   }
 }

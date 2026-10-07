@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Logo, Wordmark } from '@/components/Logo'
 import { ConfirmHost } from '@/components/Modal'
 import { Toaster } from '@/components/Toaster'
+import { UpdateBanner } from '@/components/UpdateBanner'
 import { Splash } from '@/components/Splash'
 import { AuthScreen } from '@/features/auth/AuthScreen'
 import { MainLayout } from '@/features/layout/MainLayout'
@@ -23,11 +24,12 @@ export function App() {
   else screen = <MainLayout key={session.user.id} userId={session.user.id} />
 
   return (
-    <>
-      {screen}
+    <div className="flex h-full flex-col">
+      <UpdateBanner />
+      <div className="min-h-0 flex-1">{screen}</div>
       <ConfirmHost />
       <Toaster />
-    </>
+    </div>
   )
 }
 

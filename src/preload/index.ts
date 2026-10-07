@@ -13,6 +13,15 @@ const api: TurkcordApi = {
   flashWindow: () => ipcRenderer.send('window:flash'),
   setBadge: (count, dataUrl) => ipcRenderer.send('window:badge', count, dataUrl),
   idleSeconds: () => ipcRenderer.invoke('app:idle-seconds'),
+  updateReady: () => ipcRenderer.invoke('guncelleme:durum'),
+  onUpdateReady: (callback) => {
+    const listener = (_event: unknown, version: unknown) => {
+      if (typeof version === 'string') callback(version)
+    }
+    ipcRenderer.on('guncelleme:hazir', listener)
+    return () => ipcRenderer.removeListener('guncelleme:hazir', listener)
+  },
+  installUpdate: () => ipcRenderer.invoke('guncelleme:kur'),
 }
 
 contextBridge.exposeInMainWorld('turkcord', api)

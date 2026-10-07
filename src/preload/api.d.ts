@@ -11,6 +11,10 @@ export interface TurkcordApi {
   setBadge: (count: number, dataUrl: string | null) => void
   // Bilgisayarın kaç saniyedir kullanılmadığı (Boşta durumu için).
   idleSeconds: () => Promise<number>
+  // Otomatik güncelleme: indirilen yeni sürüm hazır olunca haber verir.
+  updateReady: () => Promise<string | null>
+  onUpdateReady: (callback: (version: string) => void) => () => void
+  installUpdate: () => Promise<void>
 }
 
 declare global {

@@ -26,7 +26,8 @@ Sunucu tarafında [Supabase](https://supabase.com) kullanır ve ücretsiz planla
 | ✅ | Okunmamış rozetleri, masaüstü bildirimleri, açık ve koyu tema |
 | ✅ | Yönetici paneli: davet kodları, şifre sıfırlama, hesap askıya alma |
 | ✅ | Sesli sohbet: P2P WebRTC, konuşan göstergesi, susturma/sağırlaştırma, kişi başı ses ayarı, cihaz seçimi, gürültü ve yankı engelleme |
-| 🔜 | Otomatik güncelleme, sistem tepsisi |
+| ✅ | Otomatik güncelleme (yeni sürüm arka planda iner, tek tıkla kurulur) |
+| 🔜 | Sistem tepsisi, Windows açılışında başlatma, bas-konuş |
 
 ## Arkadaşlar için kurulum
 

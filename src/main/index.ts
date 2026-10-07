@@ -2,6 +2,7 @@ import { app, BrowserWindow, clipboard, Menu, nativeImage, session, shell } from
 import { join } from 'node:path'
 import { registerAuthStorage } from './authStorage'
 import { registerWindowIpc } from './windowIpc'
+import { setupUpdater } from './updater'
 import { isSafeExternalUrl, isTrustedUrl } from './security'
 
 const APP_ID = 'com.turkcord.app'
@@ -123,6 +124,7 @@ void app.whenReady().then(() => {
   hardenSession()
   registerAuthStorage()
   registerWindowIpc(() => mainWindow)
+  setupUpdater(() => mainWindow)
   mainWindow = createWindow()
   mainWindow.on('closed', () => {
     mainWindow = null
