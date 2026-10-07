@@ -1,0 +1,19 @@
+# Bağımlılıklar ve derleme çıktıları
+node_modules/
+out/
+dist/
+release/
+*.tsbuildinfo
+
+# Ortam dosyaları: gerçek değerler asla repoya girmez
+.env
+.env.*
+!.env.example
+
+# Sistem / editör
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.log

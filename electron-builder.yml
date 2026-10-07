@@ -1,0 +1,40 @@
+# Windows kurulum dosyası ayarları (electron-builder).
+appId: com.turkcord.app
+productName: Turkcord
+copyright: Turkcord
+directories:
+  output: release
+  buildResources: resources
+files:
+  - out/**/*
+  - package.json
+  - '!**/*.map'
+extraResources:
+  - from: resources/icon.png
+    to: icon.png
+asar: true
+# Uygulama dosyalarına müdahale edilmesini ve Electron'un Node.js gibi çalıştırılmasını engeller.
+electronFuses:
+  runAsNode: false
+  enableCookieEncryption: true
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+win:
+  icon: resources/icon.png
+  target:
+    - target: nsis
+      arch: [x64]
+  artifactName: Turkcord-Kurulum-${version}.${ext}
+nsis:
+  oneClick: true
+  perMachine: false
+  deleteAppDataOnUninstall: false
+  shortcutName: Turkcord
+  uninstallDisplayName: Turkcord
+publish:
+  provider: github
+  owner: Esehannn
+  repo: turkcord
+  releaseType: release

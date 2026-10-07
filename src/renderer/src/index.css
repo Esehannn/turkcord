@@ -1,0 +1,166 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/inter';
+
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+/* Açık tema (varsayılan): beyaz zemin, Türk kırmızısı vurgular. */
+:root {
+  --tc-accent: #e30a17;
+  --tc-accent-hover: #c20812;
+  --tc-accent-soft: #fdecee;
+  --tc-on-accent: #ffffff;
+
+  --tc-rail: #e30a17;
+  --tc-rail-item: rgba(255, 255, 255, 0.18);
+  --tc-rail-item-hover: rgba(255, 255, 255, 0.3);
+  --tc-rail-text: #ffffff;
+  --tc-rail-active: #ffffff;
+  --tc-rail-active-text: #e30a17;
+
+  --tc-sidebar: #f4f4f5;
+  --tc-chat: #ffffff;
+  --tc-elevated: #ffffff;
+  --tc-input: #efeff1;
+  --tc-hover: rgba(24, 24, 27, 0.05);
+  --tc-selected: rgba(227, 10, 23, 0.1);
+  --tc-line: #e4e4e7;
+
+  --tc-fg: #18181b;
+  --tc-muted: #5f5f68;
+  --tc-faint: #8e8e97;
+
+  --tc-mention: rgba(227, 10, 23, 0.07);
+  --tc-online: #23a55a;
+  --tc-idle: #e6a01a;
+  --tc-dnd: #e30a17;
+  --tc-offline: #9a9aa3;
+  --tc-success: #1f8f4e;
+
+  --tc-shadow: 0 10px 34px rgba(0, 0, 0, 0.14);
+  color-scheme: light;
+}
+
+/* Koyu tema: koyu zemin, aynı kırmızı vurgular. */
+[data-theme='dark'] {
+  --tc-accent: #e30a17;
+  --tc-accent-hover: #f2303c;
+  --tc-accent-soft: rgba(227, 10, 23, 0.2);
+
+  --tc-rail: #121214;
+  --tc-rail-item: #26262b;
+  --tc-rail-item-hover: #e30a17;
+  --tc-rail-text: #f2f2f3;
+  --tc-rail-active: #e30a17;
+  --tc-rail-active-text: #ffffff;
+
+  --tc-sidebar: #1b1b1f;
+  --tc-chat: #232328;
+  --tc-elevated: #2b2b31;
+  --tc-input: #18181c;
+  --tc-hover: rgba(255, 255, 255, 0.05);
+  --tc-selected: rgba(227, 10, 23, 0.22);
+  --tc-line: #34343b;
+
+  --tc-fg: #f2f2f3;
+  --tc-muted: #a9a9b2;
+  --tc-faint: #77777f;
+
+  --tc-mention: rgba(227, 10, 23, 0.14);
+  --tc-offline: #6f6f78;
+  --tc-success: #3ac477;
+
+  --tc-shadow: 0 10px 34px rgba(0, 0, 0, 0.5);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, 'Segoe UI', sans-serif;
+  --color-accent: var(--tc-accent);
+  --color-accent-hover: var(--tc-accent-hover);
+  --color-accent-soft: var(--tc-accent-soft);
+  --color-on-accent: var(--tc-on-accent);
+  --color-rail: var(--tc-rail);
+  --color-rail-item: var(--tc-rail-item);
+  --color-rail-item-hover: var(--tc-rail-item-hover);
+  --color-rail-text: var(--tc-rail-text);
+  --color-rail-active: var(--tc-rail-active);
+  --color-rail-active-text: var(--tc-rail-active-text);
+  --color-sidebar: var(--tc-sidebar);
+  --color-chat: var(--tc-chat);
+  --color-elevated: var(--tc-elevated);
+  --color-input: var(--tc-input);
+  --color-hover: var(--tc-hover);
+  --color-selected: var(--tc-selected);
+  --color-line: var(--tc-line);
+  --color-fg: var(--tc-fg);
+  --color-muted: var(--tc-muted);
+  --color-faint: var(--tc-faint);
+  --color-mention: var(--tc-mention);
+  --color-online: var(--tc-online);
+  --color-idle: var(--tc-idle);
+  --color-dnd: var(--tc-dnd);
+  --color-offline: var(--tc-offline);
+  --color-success: var(--tc-success);
+  --shadow-pop: var(--tc-shadow);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--tc-chat);
+  color: var(--tc-fg);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  user-select: none;
+}
+
+.selectable,
+input,
+textarea {
+  user-select: text;
+}
+
+:focus-visible {
+  outline: 2px solid var(--tc-accent);
+  outline-offset: 2px;
+}
+
+/* Yazı alanları odağı kendi kenarlığıyla gösterir. */
+input:focus-visible,
+textarea:focus-visible {
+  outline: none;
+}
+
+/* İnce kaydırma çubukları */
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--tc-line) transparent;
+}
+
+.spoiler {
+  background: var(--tc-fg);
+  color: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.spoiler[data-revealed='true'] {
+  background: var(--tc-hover);
+  color: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
