@@ -1,0 +1,59 @@
+name: Kontrol
+
+on:
+  push:
+    branches: [main, 'claude/**']
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  uygulama:
+    name: Tip kontrolü, testler ve derleme
+    runs-on: ubuntu-latest
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      VITE_SUPABASE_URL: https://ornek.supabase.co
+      VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_ornek
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  veritabani:
+    name: Veritabanı güvenlik testleri
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+      - run: bash scripts/db-test.sh
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:test@localhost:5432/postgres
+
+  gizli-bilgi:
+    name: Gizli bilgi taraması
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

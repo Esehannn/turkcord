@@ -1,0 +1,33 @@
+name: Sürüm
+
+# "v0.1.0" gibi bir etiket gönderilince (ya da Actions sekmesinden elle çalıştırılınca)
+# Windows kurulum dosyasını derler ve GitHub Releases'a yükler.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    name: Windows kurulum dosyası
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Derle
+        run: npm run build
+        env:
+          # Repo ayarları > Secrets and variables > Actions > Variables bölümünde tanımlanır.
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+      - name: Kurulum dosyası oluştur ve yayınla
+        run: npx electron-builder --win --x64 --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
