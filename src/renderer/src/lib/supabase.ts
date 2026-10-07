@@ -6,9 +6,50 @@ const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string |
 
 export const isConfigured = Boolean(url && publishableKey)
 
-// Electron'da oturum, işletim sisteminin şifrelemesiyle korunan dosyada tutulur (bkz. src/main/authStorage.ts).
-// Tarayıcıda geliştirme yaparken localStorage'a düşer.
-const storage: SupportedStorage | undefined = window.turkcord?.authStorage
+// "Beni hatırla" açıkken oturum kalıcı depoda tutulur: Electron'da işletim sisteminin şifrelemesiyle korunan
+// dosya (bkz. src/main/authStorage.ts), tarayıcıda geliştirirken localStorage. Kapalıyken sadece bellekte
+// tutulur; uygulama kapanınca oturum da kapanır.
+const REMEMBER_KEY = 'turkcord-beni-hatirla'
+
+export function getRememberMe(): boolean {
+  try {
+    return localStorage.getItem(REMEMBER_KEY) !== 'hayir'
+  } catch {
+    return true
+  }
+}
+
+export function setRememberMe(remember: boolean): void {
+  try {
+    localStorage.setItem(REMEMBER_KEY, remember ? 'evet' : 'hayir')
+  } catch {
+    // Tercih kaydedilemezse varsayılan (hatırla) geçerli olur.
+  }
+}
+
+const browserStorage: SupportedStorage = {
+  getItem: (key) => localStorage.getItem(key),
+  setItem: (key, value) => localStorage.setItem(key, value),
+  removeItem: (key) => localStorage.removeItem(key),
+}
+const persistent: SupportedStorage = window.turkcord?.authStorage ?? browserStorage
+const memory = new Map<string, string>()
+
+const storage: SupportedStorage = {
+  getItem: (key) => (getRememberMe() ? persistent.getItem(key) : (memory.get(key) ?? null)),
+  setItem: async (key, value) => {
+    if (getRememberMe()) {
+      await persistent.setItem(key, value)
+    } else {
+      memory.set(key, value)
+      await persistent.removeItem(key)
+    }
+  },
+  removeItem: async (key) => {
+    memory.delete(key)
+    await persistent.removeItem(key)
+  },
+}
 
 export const supabase = createClient<Database>(url ?? 'http://localhost', publishableKey ?? 'missing-key', {
   auth: {
