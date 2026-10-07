@@ -18,7 +18,8 @@
 - [x] **2. Arkadaşlar ve DM**: arkadaşlık istekleri, engelleme, özel mesajlar
 - [x] **3. Sunucular**: sunucu kurma, davet, roller, yazı kanalları, tepkiler, görseller, okunmamış takibi
 - [x] **4. Ses**: sesli kanallar (P2P), sustur/sağırlaştır, konuşan göstergesi, kişi başı ses ayarı, giriş/çıkış sesleri
-- [ ] **5. Cilalama**: otomatik güncelleme, sistem tepsisi, Windows açılışında başlatma, bas-konuş
+- [x] **5. Cilalama**: otomatik güncelleme, sistem tepsisi, Windows açılışında başlatma, bas-konuş, kısayollar,
+  yapay zekâ gürültü engelleme, ping göstergesi, sunucu rolleri, @etiket önerisi
 
 ## Bilinçli olarak dışarıda bırakılanlar
 

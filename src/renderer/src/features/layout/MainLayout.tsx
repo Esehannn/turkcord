@@ -14,6 +14,7 @@ import { ServerRail } from './ServerRail'
 import { UserPanel } from './UserPanel'
 import { VoicePanel } from '@/features/voice/VoicePanel'
 import { leaveVoice } from '@/voice/engine'
+import { startDesktopBridge } from '@/lib/desktop'
 import { EmptyState } from '@/components/ui'
 import { Hash } from 'lucide-react'
 
@@ -29,6 +30,7 @@ export function MainLayout({ userId }: { userId: string }) {
 
   // Oturum kapanınca ses kanalından da çık.
   useEffect(() => () => void leaveVoice(false), [])
+  useEffect(() => startDesktopBridge(), [])
 
   // Bildirim izni bir kez istenir (Windows'ta genelde otomatik verilir).
   useEffect(() => {

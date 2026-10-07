@@ -278,6 +278,45 @@ select tests.fails(format('select public.set_member_role(%L, %L, %L)', :'server_
 delete from public.servers where id = :'server_id';
 select tests.ok((select count(*) = 1 from public.servers where id = :'server_id'), 'yönetici sunucuyu silemez');
 
+-- Özel roller (adlı, renkli)
+select public.create_server_role(:'server_id', ' Çaycı ', '#1A7F37') as rol_id \gset
+select tests.ok((select name = 'Çaycı' and color = '#1a7f37' from public.server_roles where id = :'rol_id'), 'yönetici rol oluşturabilir');
+select tests.fails(format('select public.create_server_role(%L, %L, %L)', :'server_id', 'x', 'kırmızı'), 'geçersiz renk reddedilir', 'turkcord:invalid_input');
+select tests.fails(format('select public.create_server_role(%L, %L, %L)', :'server_id', '   ', '#ffffff'), 'boş rol adı reddedilir', 'turkcord:invalid_input');
+select tests.fails(
+  format('insert into public.server_roles (server_id, name) values (%L, %L)', :'server_id', 'Doğrudan'),
+  'rol tablosuna doğrudan yazılamaz', 'permission denied');
+select public.set_member_server_role(:'server_id', :'veli', :'rol_id');
+select tests.ok((select role_id = :'rol_id'::uuid from public.server_members where server_id = :'server_id' and user_id = :'veli'), 'yönetici üyeye rol verebilir');
+select tests.fails(format('select public.set_member_server_role(%L, %L, %L)', :'server_id', :'ali', :'rol_id'), 'yönetici sahibin rolünü değiştiremez', 'turkcord:forbidden');
+select tests.fails(
+  format('update public.server_members set role_id = null where server_id = %L and user_id = %L', :'server_id', :'veli'),
+  'üye tablosundaki rol doğrudan değiştirilemez', 'permission denied');
+select public.update_server_role(:'rol_id', 'Baş Çaycı', '#c2410c', 3);
+select tests.ok((select name = 'Baş Çaycı' and position = 3 from public.server_roles where id = :'rol_id'), 'yönetici rolü düzenleyebilir');
+
+reset role;
+select tests.login(:'mehmet');
+set role authenticated;
+select tests.ok((select count(*) = 0 from public.server_roles where server_id = :'server_id'), 'üye olmayan sunucu rollerini göremez');
+select tests.fails(format('select public.create_server_role(%L, %L, %L)', :'server_id', 'Sızma', '#000000'), 'üye olmayan rol oluşturamaz', 'turkcord:forbidden');
+select tests.fails(format('select public.delete_server_role(%L)', :'rol_id'), 'üye olmayan rol silemez', 'turkcord:forbidden');
+select tests.fails(format('select public.set_member_server_role(%L, %L, %L)', :'server_id', :'veli', null), 'üye olmayan rol veremez', 'turkcord:forbidden');
+
+reset role;
+select tests.login(:'ali');
+set role authenticated;
+select public.create_server('Deneme') as deneme_id \gset
+select tests.fails(format('select public.set_member_server_role(%L, %L, %L)', :'deneme_id', :'ali', :'rol_id'), 'başka sunucunun rolü verilemez', 'turkcord:invalid_input');
+delete from public.servers where id = :'deneme_id';
+select public.set_member_server_role(:'server_id', :'ali', :'rol_id');
+select public.delete_server_role(:'rol_id');
+select tests.ok((select count(*) = 0 from public.server_members where server_id = :'server_id' and role_id is not null), 'rol silinince üyelerden de kalkar');
+
+reset role;
+select tests.login(:'veli');
+set role authenticated;
+
 -- ---------------------------------------------------------------------------
 -- 6. Mesaj düzenleme, silme ve tepkiler
 -- ---------------------------------------------------------------------------

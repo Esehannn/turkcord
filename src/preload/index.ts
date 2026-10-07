@@ -22,6 +22,17 @@ const api: TurkcordApi = {
     return () => ipcRenderer.removeListener('guncelleme:hazir', listener)
   },
   installUpdate: () => ipcRenderer.invoke('guncelleme:kur'),
+  desktopSettings: () => ipcRenderer.invoke('masaustu:ayarlar'),
+  setDesktopSettings: (patch) => ipcRenderer.invoke('masaustu:ayarla', patch),
+  setShortcuts: (shortcuts) => ipcRenderer.invoke('kisayol:ayarla', shortcuts),
+  onShortcut: (callback) => {
+    const listener = (_event: unknown, command: unknown) => {
+      if (command === 'mute' || command === 'deafen') callback(command)
+    }
+    ipcRenderer.on('kisayol:basildi', listener)
+    return () => ipcRenderer.removeListener('kisayol:basildi', listener)
+  },
+  reportVoiceStatus: (status) => ipcRenderer.send('ses:durum', status),
 }
 
 contextBridge.exposeInMainWorld('turkcord', api)

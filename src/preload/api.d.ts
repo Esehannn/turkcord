@@ -15,7 +15,15 @@ export interface TurkcordApi {
   updateReady: () => Promise<string | null>
   onUpdateReady: (callback: (version: string) => void) => () => void
   installUpdate: () => Promise<void>
+  // Masaüstü: tepsiye küçültme, Windows ile başlatma, her yerde çalışan kısayollar.
+  desktopSettings: () => Promise<DesktopSettings | null>
+  setDesktopSettings: (patch: Partial<DesktopSettings>) => Promise<DesktopSettings | null>
+  setShortcuts: (shortcuts: { mute: string | null; deafen: string | null }) => Promise<{ mute: boolean; deafen: boolean } | null>
+  onShortcut: (callback: (command: 'mute' | 'deafen') => void) => () => void
+  reportVoiceStatus: (status: { inVoice: boolean; muted: boolean; deafened: boolean }) => void
 }
+
+export type DesktopSettings = { closeToTray: boolean; openAtLogin: boolean }
 
 declare global {
   interface Window {

@@ -20,14 +20,15 @@ Sunucu tarafında [Supabase](https://supabase.com) kullanır ve ücretsiz planla
 | ✅ | Çevrimiçi / Boşta / Rahatsız Etmeyin / Görünmez durumları |
 | ✅ | Arkadaş ekleme, istekler, engelleme |
 | ✅ | Özel mesajlar (DM) |
-| ✅ | Sunucu kurma, davet kodlarıyla katılma, roller (sahip / yönetici / üye) |
+| ✅ | Sunucu kurma, sunucu fotoğrafı, davet kodlarıyla katılma, yetkiler (sahip / yönetici / üye) ve renkli özel roller |
 | ✅ | Yazı kanalları: anlık mesajlar, yanıtlama, düzenleme, silme, emoji tepkileri, görsel gönderme |
-| ✅ | Biçimlendirme (**kalın**, *italik*, `kod`, spoiler), @etiketleme, "yazıyor…" göstergesi |
+| ✅ | Biçimlendirme (**kalın**, *italik*, `kod`, spoiler), otomatik tamamlamalı @etiketleme, "yazıyor…" göstergesi |
 | ✅ | Okunmamış rozetleri, masaüstü bildirimleri, açık ve koyu tema |
 | ✅ | Yönetici paneli: davet kodları, şifre sıfırlama, hesap askıya alma |
-| ✅ | Sesli sohbet: P2P WebRTC, konuşan göstergesi, susturma/sağırlaştırma, kişi başı ses ayarı, cihaz seçimi, gürültü ve yankı engelleme |
+| ✅ | Sesli sohbet: P2P WebRTC, konuşan göstergesi, ping göstergesi, susturma/sağırlaştırma, kişi başı ses ayarı, cihaz seçimi |
+| ✅ | Yapay zekâ gürültü engelleme (RNNoise), giriş hassasiyeti, yankı engelleme, bas-konuş |
 | ✅ | Otomatik güncelleme (yeni sürüm arka planda iner, tek tıkla kurulur) |
-| 🔜 | Sistem tepsisi, Windows açılışında başlatma, bas-konuş |
+| ✅ | Sistem tepsisi, Windows açılışında başlatma, oyundayken de çalışan mikrofon/sağırlaştırma kısayolları |
 
 ## Arkadaşlar için kurulum
 

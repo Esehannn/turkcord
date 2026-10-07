@@ -63,7 +63,7 @@ export function UserPanel({ userId }: { userId: string }) {
       {menuOpen && (
         <>
           <div className="fixed inset-0 z-30" onClick={() => setMenuOpen(false)} />
-          <div className="absolute bottom-16 left-2 z-40 w-64 rounded-lg border border-line bg-elevated p-1.5 shadow-pop">
+          <div className="anim-pop absolute bottom-16 left-2 z-40 w-64 rounded-lg border border-line bg-elevated p-1.5 shadow-pop">
             {STATUS_OPTIONS.map((o) => (
               <button
                 key={o.value}

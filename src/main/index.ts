@@ -1,6 +1,7 @@
 import { app, BrowserWindow, clipboard, Menu, nativeImage, session, shell } from 'electron'
 import { join } from 'node:path'
 import { registerAuthStorage } from './authStorage'
+import { hideOnClose, setupDesktop, startedHidden } from './desktop'
 import { registerWindowIpc } from './windowIpc'
 import { setupUpdater } from './updater'
 import { isSafeExternalUrl, isTrustedUrl } from './security'
@@ -41,7 +42,11 @@ function createWindow(): BrowserWindow {
     },
   })
 
-  win.once('ready-to-show', () => win.show())
+  // Windows açılışında başlatıldıysa tepside bekler.
+  win.once('ready-to-show', () => {
+    if (!startedHidden()) win.show()
+  })
+  hideOnClose(win)
 
   // Yeni pencere açılmaz; güvenli bağlantılar varsayılan tarayıcıda açılır.
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -125,6 +130,7 @@ void app.whenReady().then(() => {
   registerAuthStorage()
   registerWindowIpc(() => mainWindow)
   setupUpdater(() => mainWindow)
+  setupDesktop(() => mainWindow, iconPath())
   mainWindow = createWindow()
   mainWindow.on('closed', () => {
     mainWindow = null

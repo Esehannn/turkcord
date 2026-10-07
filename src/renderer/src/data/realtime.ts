@@ -109,6 +109,12 @@ export function useRealtimeSync(userId: string): void {
           }
         }
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'server_roles' }, (p) => {
+        const row = (p.eventType === 'DELETE' ? p.old : p.new) as { server_id?: string }
+        void qc.invalidateQueries({ queryKey: row.server_id ? keys.roles(row.server_id) : ['roles'] })
+        // Silinen rol üyelerden de kalkar.
+        if (p.eventType === 'DELETE') void qc.invalidateQueries({ queryKey: ['members'] })
+      })
       .on<ChannelRow>('postgres_changes', { event: '*', schema: 'public', table: 'channels' }, (p) => {
         const row = (p.eventType === 'DELETE' ? p.old : p.new) as Partial<ChannelRow>
         if (row.server_id) void qc.invalidateQueries({ queryKey: keys.channels(row.server_id) })

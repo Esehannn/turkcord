@@ -1,6 +1,6 @@
-import { useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Bell, KeyRound, LogOut, Mic, Palette, ShieldCheck, User } from 'lucide-react'
+import { Bell, KeyRound, LogOut, Mic, Monitor, Palette, ShieldCheck, User } from 'lucide-react'
 import { Avatar } from '@/components/Avatar'
 import { confirmDialog, Modal } from '@/components/Modal'
 import { Button, Field, Input } from '@/components/ui'
@@ -16,7 +16,7 @@ import { checkPassword, PASSWORD_MESSAGES } from '@shared/password'
 import { AdminPanel } from './AdminPanel'
 import { VoiceSettings } from './VoiceSettings'
 
-type Tab = 'profile' | 'voice' | 'appearance' | 'notifications' | 'account' | 'admin'
+type Tab = 'profile' | 'voice' | 'appearance' | 'notifications' | 'desktop' | 'account' | 'admin'
 
 export function SettingsModal({ initialTab = 'profile', onClose }: { initialTab?: Tab; onClose: () => void }) {
   const me = useSession((s) => s.session?.user.id) ?? ''
@@ -28,6 +28,7 @@ export function SettingsModal({ initialTab = 'profile', onClose }: { initialTab?
     { value: 'voice', label: 'Ses ve Mikrofon', icon: Mic, show: true },
     { value: 'appearance', label: 'Görünüm', icon: Palette, show: true },
     { value: 'notifications', label: 'Bildirimler', icon: Bell, show: true },
+    { value: 'desktop', label: 'Windows', icon: Monitor, show: !!window.turkcord?.desktopSettings },
     { value: 'account', label: 'Hesap', icon: KeyRound, show: true },
     { value: 'admin', label: 'Yönetici', icon: ShieldCheck, show: !!profile?.is_admin },
   ]
@@ -57,6 +58,7 @@ export function SettingsModal({ initialTab = 'profile', onClose }: { initialTab?
           {tab === 'voice' && <VoiceSettings />}
           {tab === 'appearance' && <AppearanceTab />}
           {tab === 'notifications' && <NotificationsTab />}
+          {tab === 'desktop' && <DesktopTab />}
           {tab === 'account' && <AccountTab username={profile?.username ?? ''} onClose={onClose} />}
           {tab === 'admin' && profile?.is_admin && <AdminPanel />}
         </div>
@@ -220,6 +222,34 @@ function NotificationsTab() {
       />
       <Toggle label="Bildirim sesi" hint="Yeni mesajda kısa bir ses çal." checked={sounds} onChange={(v) => setPrefs({ sounds: v })} />
       <p className="text-xs text-faint">"Rahatsız Etmeyin" durumundayken bildirim ve ses gelmez.</p>
+    </Section>
+  )
+}
+
+function DesktopTab() {
+  const [settings, setSettings] = useState<{ closeToTray: boolean; openAtLogin: boolean } | null>(null)
+  useEffect(() => {
+    void window.turkcord?.desktopSettings().then(setSettings)
+  }, [])
+  async function update(patch: { closeToTray?: boolean; openAtLogin?: boolean }) {
+    const next = await window.turkcord?.setDesktopSettings(patch)
+    if (next) setSettings(next)
+  }
+  if (!settings) return null
+  return (
+    <Section title="Windows">
+      <Toggle
+        label="Windows açılınca başlat"
+        hint="Bilgisayar açılınca Turkcord sağ alttaki simge olarak sessizce açılır."
+        checked={settings.openAtLogin}
+        onChange={(v) => void update({ openAtLogin: v })}
+      />
+      <Toggle
+        label="Kapatınca simge durumuna küçült"
+        hint="Pencereyi kapatınca Turkcord kapanmaz; sağ alttaki simgeye iner, mesajlar ve sesli sohbet devam eder. Tamamen kapatmak için simgeye sağ tıklayıp Çıkış'ı seç."
+        checked={settings.closeToTray}
+        onChange={(v) => void update({ closeToTray: v })}
+      />
     </Section>
   )
 }

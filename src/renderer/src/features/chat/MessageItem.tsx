@@ -26,6 +26,8 @@ type Props = {
   onEdit: (id: string | null) => void
   onReply: (message: ChatMessage) => void
   profileName: (id: string) => string
+  // Yazarın sunucu rolünün rengi.
+  nameColor?: string
 }
 
 export const MessageItem = memo(function MessageItem({
@@ -41,6 +43,7 @@ export const MessageItem = memo(function MessageItem({
   onEdit,
   onReply,
   profileName,
+  nameColor,
 }: Props) {
   const actions = useActions()
   const openModal = useUi((s) => s.openModal)
@@ -108,6 +111,7 @@ export const MessageItem = memo(function MessageItem({
                 type="button"
                 onClick={() => author && openModal({ kind: 'profile', userId: author.id })}
                 className="font-semibold text-fg hover:underline"
+                style={nameColor ? { color: nameColor } : undefined}
               >
                 {name}
               </button>

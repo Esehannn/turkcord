@@ -5,6 +5,8 @@ import { useActions } from '@/data/actions'
 import type { ChatMessage } from '@/data/queries'
 import type { Attachment } from '@/lib/database.types'
 import { IMAGE_TYPES, uploadAttachment } from '@/lib/images'
+import { filterMentions, insertMention, mentionQuery, type MentionCandidate } from '@/lib/mentions'
+import { Avatar } from '@/components/Avatar'
 import { toast } from '@/stores/toast'
 import { EmojiPicker } from './EmojiPicker'
 
@@ -23,16 +25,31 @@ type Props = {
   onCancelReply: () => void
   onEditLast: () => void
   onTyping: () => void
+  // "@" yazınca önerilecek kişiler.
+  mentionables: (MentionCandidate & { avatar_path: string | null })[]
 }
 
 // Taslaklar kanal değiştirince kaybolmasın.
 const drafts = new Map<string, string>()
 
-export function Composer({ channelId, userId, placeholder, disabledReason, replyTo, replyName, onCancelReply, onEditLast, onTyping }: Props) {
+export function Composer({
+  channelId,
+  userId,
+  placeholder,
+  disabledReason,
+  replyTo,
+  replyName,
+  onCancelReply,
+  onEditLast,
+  onTyping,
+  mentionables,
+}: Props) {
   const [text, setText] = useState(() => drafts.get(channelId) ?? '')
   const [files, setFiles] = useState<Pending[]>([])
   const [sending, setSending] = useState(false)
   const [picker, setPicker] = useState(false)
+  const [mention, setMention] = useState<{ start: number; query: string } | null>(null)
+  const [mentionIndex, setMentionIndex] = useState(0)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const actions = useActions()
@@ -92,7 +109,45 @@ export function Composer({ channelId, userId, placeholder, disabledReason, reply
     }
   }
 
+  const suggestions = mention ? filterMentions(mentionables, mention.query) : []
+
+  function updateMention(value: string, caret: number) {
+    const next = mentionQuery(value, caret)
+    setMention(next)
+    if (next?.query !== mention?.query) setMentionIndex(0)
+  }
+
+  function pickMention(candidate: MentionCandidate) {
+    const el = inputRef.current
+    if (!el || !mention) return
+    const result = insertMention(text, mention.start, el.selectionStart, candidate.username)
+    setText(result.text)
+    setMention(null)
+    requestAnimationFrame(() => {
+      el.focus()
+      el.setSelectionRange(result.caret, result.caret)
+    })
+  }
+
   function onKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
+    if (suggestions.length > 0 && !e.nativeEvent.isComposing) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault()
+        const step = e.key === 'ArrowDown' ? 1 : -1
+        setMentionIndex((i) => (i + step + suggestions.length) % suggestions.length)
+        return
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault()
+        pickMention(suggestions[Math.min(mentionIndex, suggestions.length - 1)])
+        return
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setMention(null)
+        return
+      }
+    }
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault()
       void send()
@@ -130,6 +185,31 @@ export function Composer({ channelId, userId, placeholder, disabledReason, reply
           <IconButton label="Yanıtı iptal et" className="size-6" onClick={onCancelReply}>
             <X className="size-3.5" />
           </IconButton>
+        </div>
+      )}
+      {suggestions.length > 0 && (
+        <div className="relative">
+          <div className="anim-pop absolute right-0 bottom-1 left-0 z-20 overflow-hidden rounded-lg border border-line bg-elevated py-1 shadow-pop" role="listbox">
+            <p className="px-3 py-1 text-[11px] font-bold tracking-wide text-faint uppercase">Kişiler</p>
+            {suggestions.map((c, i) => (
+              <button
+                key={c.id}
+                type="button"
+                role="option"
+                aria-selected={i === mentionIndex}
+                onMouseDown={(e) => {
+                  e.preventDefault()
+                  pickMention(c)
+                }}
+                onMouseEnter={() => setMentionIndex(i)}
+                className={`flex w-full items-center gap-2.5 px-3 py-1.5 text-left ${i === mentionIndex ? 'bg-selected' : ''}`}
+              >
+                <Avatar name={c.display_name} path={mentionables.find((m) => m.id === c.id)?.avatar_path} size={24} />
+                <span className="truncate text-sm font-medium text-fg">{c.display_name}</span>
+                <span className="truncate text-xs text-faint">@{c.username}</span>
+              </button>
+            ))}
+          </div>
         </div>
       )}
       <div
@@ -180,8 +260,11 @@ export function Composer({ channelId, userId, placeholder, disabledReason, reply
             placeholder={placeholder}
             onChange={(e) => {
               setText(e.target.value)
+              updateMention(e.target.value, e.target.selectionStart)
               if (e.target.value) onTyping()
             }}
+            onSelect={(e) => updateMention(e.currentTarget.value, e.currentTarget.selectionStart)}
+            onBlur={() => setTimeout(() => setMention(null), 150)}
             onKeyDown={onKeyDown}
             onPaste={onPaste}
             className="max-h-[40vh] flex-1 resize-none bg-transparent py-3 text-[15px] text-fg outline-none placeholder:text-faint"

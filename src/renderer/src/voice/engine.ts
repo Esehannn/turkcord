@@ -1,10 +1,11 @@
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { toast } from '@/stores/toast'
+import { micErrorMessage, openMicrophone, type Microphone } from './mic'
 import { trackVoice, untrackVoice, watchVoiceRoom } from './presence'
 import { tuneOpus } from './sdp'
 import { voiceSounds } from './sounds'
-import { useVoice, volumeOf } from './store'
+import { micOpen, useVoice, volumeOf, type PeerLink } from './store'
 
 // Sesli sohbet: kanaldaki herkes birbirine doğrudan (P2P, WebRTC) bağlanır. Ses Supabase'den geçmez;
 // Supabase sadece bağlantı kurulurken bilgi alışverişi ("ses:{kanal}" yayını) ve kimin kanalda
@@ -33,8 +34,9 @@ type Peer = {
 }
 
 let me = ''
-let localStream: MediaStream | null = null
+let mic: Microphone | null = null
 let stopLocalMeter: (() => void) | undefined
+let statsTimer: ReturnType<typeof setInterval> | undefined
 let signal: RealtimeChannel | null = null
 let unwatch: (() => void) | null = null
 let iceServers: RTCIceServer[] = [{ urls: ['stun:stun.cloudflare.com:3478', 'stun:stun.l.google.com:19302'] }]
@@ -60,27 +62,6 @@ async function loadIceServers(): Promise<void> {
   }
 }
 
-function microphoneConstraints(): MediaTrackConstraints {
-  const { inputDeviceId, noiseSuppression, echoCancellation } = useVoice.getState()
-  return {
-    deviceId: inputDeviceId && inputDeviceId !== 'default' ? { ideal: inputDeviceId } : undefined,
-    echoCancellation,
-    noiseSuppression,
-    autoGainControl: true,
-    channelCount: 1,
-  }
-}
-
-function micError(error: unknown): string {
-  const name = (error as { name?: string })?.name
-  if (name === 'NotAllowedError' || name === 'SecurityError') {
-    return 'Mikrofon izni yok. Windows Ayarları > Gizlilik > Mikrofon bölümünden masaüstü uygulamalarına izin ver.'
-  }
-  if (name === 'NotFoundError' || name === 'OverconstrainedError') return 'Mikrofon bulunamadı. Takılı olduğundan emin ol.'
-  if (name === 'NotReadableError') return 'Mikrofon başka bir uygulama tarafından kullanılıyor olabilir.'
-  return 'Mikrofon açılamadı.'
-}
-
 // Ses seviyesini ölçüp "konuşuyor" bilgisini günceller.
 function meter(stream: MediaStream, userId: string): () => void {
   try {
@@ -98,10 +79,8 @@ function meter(stream: MediaStream, userId: string): () => void {
       let sum = 0
       for (const v of data) sum += ((v - 128) / 128) ** 2
       const rms = Math.sqrt(sum / data.length)
-      const state = useVoice.getState()
-      const silenced = userId === me ? state.muted || state.deafened : false
       const now = Date.now()
-      if (rms > SPEAKING_THRESHOLD && !silenced) lastLoud = now
+      if (rms > SPEAKING_THRESHOLD) lastLoud = now
       const next = now - lastLoud < SPEAKING_HOLD_MS
       if (next !== speaking) {
         speaking = next
@@ -151,7 +130,7 @@ function createPeer(userId: string): Peer {
   peers.set(userId, peer)
   setPeerState(userId, pc.connectionState)
 
-  for (const track of localStream?.getTracks() ?? []) pc.addTrack(track, localStream!)
+  if (mic) for (const track of mic.stream.getTracks()) pc.addTrack(track, mic.stream)
 
   pc.onicecandidate = (event) => {
     if (event.candidate) send({ type: 'aday', from: me, to: userId, candidate: event.candidate.toJSON() })
@@ -200,7 +179,7 @@ function isInRoom(userId: string): boolean {
 }
 
 async function offer(userId: string): Promise<void> {
-  if (peers.has(userId) || !localStream) return
+  if (peers.has(userId) || !mic) return
   const peer = createPeer(userId)
   const description = await peer.pc.createOffer()
   description.sdp = tuneOpus(description.sdp ?? '')
@@ -281,8 +260,59 @@ function publishState(): void {
 }
 
 function applyMicrophone(): void {
-  const { muted, deafened } = useVoice.getState()
-  for (const track of localStream?.getAudioTracks() ?? []) track.enabled = !muted && !deafened
+  mic?.setEnabled(micOpen(useVoice.getState()))
+}
+
+// Kendi "konuşuyor" göstergem ses kapısına göre (kapı kapalıysa karşıya ses gitmiyor demektir).
+function localMeter(): () => void {
+  let speaking = false
+  const timer = setInterval(() => {
+    const next = !!mic && mic.level().open
+    if (next !== speaking) {
+      speaking = next
+      useVoice.setState((s) => ({ speaking: { ...s.speaking, [me]: next } }))
+    }
+  }, 80)
+  return () => {
+    clearInterval(timer)
+    useVoice.setState((s) => {
+      const copy = { ...s.speaking }
+      delete copy[me]
+      return { speaking: copy }
+    })
+  }
+}
+
+// Her bağlantının gecikmesi (ping) ve doğrudan mı yoksa aktarma sunucusu üzerinden mi gittiği.
+type PairStats = { currentRoundTripTime?: number; localCandidateId?: string; remoteCandidateId?: string }
+async function readLink(pc: RTCPeerConnection): Promise<PeerLink | null> {
+  const stats = await pc.getStats()
+  let pair: PairStats | undefined
+  stats.forEach((report: { type: string; id: string; selectedCandidatePairId?: string }) => {
+    if (report.type === 'transport' && report.selectedCandidatePairId) pair = stats.get(report.selectedCandidatePairId)
+  })
+  if (!pair) {
+    stats.forEach((report: { type: string; state?: string; nominated?: boolean }) => {
+      if (!pair && report.type === 'candidate-pair' && report.state === 'succeeded' && report.nominated) pair = report as unknown as PairStats
+    })
+  }
+  if (!pair) return null
+  const local = pair.localCandidateId ? stats.get(pair.localCandidateId) : undefined
+  const remote = pair.remoteCandidateId ? stats.get(pair.remoteCandidateId) : undefined
+  return {
+    ping: pair.currentRoundTripTime !== undefined ? Math.round(pair.currentRoundTripTime * 1000) : null,
+    relay: local?.candidateType === 'relay' || remote?.candidateType === 'relay',
+  }
+}
+
+async function refreshLinks(): Promise<void> {
+  const links: Record<string, PeerLink> = {}
+  for (const [userId, peer] of peers) {
+    if (peer.pc.connectionState !== 'connected') continue
+    const link = await readLink(peer.pc).catch(() => null)
+    if (link) links[userId] = link
+  }
+  useVoice.setState({ links })
 }
 
 // ---------------------------------------------------------------------------
@@ -302,26 +332,29 @@ export async function joinVoice(serverId: string, channelId: string, userId: str
 
   const token = ++joinToken
   me = userId
-  setState({ status: 'connecting', channelId, serverId, speaking: {}, peers: {} })
+  setState({ status: 'connecting', channelId, serverId, speaking: {}, peers: {}, links: {} })
   lastRoom = new Set()
 
   try {
     await loadIceServers()
-    localStream = await navigator.mediaDevices.getUserMedia({ audio: microphoneConstraints(), video: false })
+    mic = await openMicrophone()
   } catch (error) {
     if (token === joinToken) {
       setState({ status: 'idle', channelId: null, serverId: null })
-      toast.error(micError(error))
+      toast.error(micErrorMessage(error))
     }
     return
   }
   if (token !== joinToken) {
-    localStream.getTracks().forEach((t) => t.stop())
+    mic.stop()
+    mic = null
     return
   }
+  if (mic.fellBack) toast.info('Seçtiğin mikrofon bulunamadı, varsayılan mikrofon kullanılıyor.')
 
   applyMicrophone()
-  stopLocalMeter = meter(localStream, userId)
+  stopLocalMeter = localMeter()
+  statsTimer = setInterval(() => void refreshLinks(), 2000)
   unwatch = watchVoiceRoom(channelId, userId)
 
   const channel = supabase.channel(`ses:${channelId}`, { config: { private: true, broadcast: { self: false } } })
@@ -353,10 +386,11 @@ export async function leaveVoice(playSound = true): Promise<void> {
   signal = null
   stopLocalMeter?.()
   stopLocalMeter = undefined
-  localStream?.getTracks().forEach((t) => t.stop())
-  localStream = null
+  clearInterval(statsTimer)
+  mic?.stop()
+  mic = null
   lastRoom = new Set()
-  setState({ status: 'idle', channelId: null, serverId: null, speaking: {}, peers: {} })
+  setState({ status: 'idle', channelId: null, serverId: null, speaking: {}, peers: {}, links: {} })
   if (channelId && playSound) voiceSounds.leave()
 }
 
@@ -387,26 +421,47 @@ export function setUserVolume(userId: string, volume: number): void {
   if (peer) applyOutput(peer.audio, userId)
 }
 
-// Mikrofon ya da hoparlör değişince bağlantıyı koparmadan yeni cihaza geç.
-export async function applyDeviceChange(): Promise<void> {
+// Mikrofon, hoparlör ya da ses işleme ayarı değişince bağlantıyı koparmadan yeni hatta geç.
+export async function applyDeviceChange(reopenMic = true): Promise<void> {
   for (const [userId, peer] of peers) applyOutput(peer.audio, userId)
-  if (!localStream) return
+  if (!mic || !reopenMic) return
+  const token = joinToken
   try {
-    const next = await navigator.mediaDevices.getUserMedia({ audio: microphoneConstraints(), video: false })
-    const track = next.getAudioTracks()[0]
+    const next = await openMicrophone()
+    if (token !== joinToken || !mic) {
+      next.stop()
+      return
+    }
+    const track = next.stream.getAudioTracks()[0]
     for (const peer of peers.values()) {
       const sender = peer.pc.getSenders().find((s) => s.track?.kind === 'audio')
       await sender?.replaceTrack(track)
     }
-    localStream.getTracks().forEach((t) => t.stop())
-    localStream = next
+    mic.stop()
+    mic = next
     applyMicrophone()
-    stopLocalMeter?.()
-    stopLocalMeter = meter(next, me)
+    if (next.fellBack) toast.info('Seçtiğin mikrofon bulunamadı, varsayılan mikrofon kullanılıyor.')
   } catch (error) {
-    toast.error(micError(error))
+    toast.error(micErrorMessage(error))
   }
 }
+
+// Bas-konuş tuşu basıldı/bırakıldı.
+export function setPushToTalk(down: boolean): void {
+  const state = useVoice.getState()
+  if (state.pttDown === down) return
+  setState({ pttDown: down })
+  applyMicrophone()
+  if (state.status === 'connected' && state.inputMode === 'bas-konus' && !state.muted && !state.deafened) {
+    if (down) voiceSounds.pttOn()
+    else voiceSounds.pttOff()
+  }
+}
+
+// Ses modu değişince (ör. bas-konuş açılınca) mikrofonu hemen ona göre ayarla.
+useVoice.subscribe((state, prev) => {
+  if (state.inputMode !== prev.inputMode) applyMicrophone()
+})
 
 // Uygulama kapanırken kanaldan düzgün çık.
 window.addEventListener('beforeunload', () => {

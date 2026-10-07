@@ -5,6 +5,8 @@ import { Badge, IconButton } from '@/components/ui'
 import { useActions } from '@/data/actions'
 import { useChannels, useMembers, useServers, useUnread } from '@/data/queries'
 import type { ChannelRow } from '@/lib/database.types'
+import { initials } from '@/lib/format'
+import { publicImageUrl } from '@/lib/supabase'
 import { useSession } from '@/stores/session'
 import { joinVoice } from '@/voice/engine'
 import { useVoice } from '@/voice/store'
@@ -87,13 +89,16 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
           onClick={() => setMenuOpen((v) => !v)}
           className="flex h-12 w-full items-center gap-2 border-b border-line px-3 text-left font-semibold text-fg hover:bg-hover"
         >
+          <span className="grid size-6 shrink-0 place-items-center overflow-hidden rounded-lg bg-accent text-[10px] font-bold text-white">
+            {server.icon_path ? <img src={publicImageUrl(server.icon_path) ?? ''} alt="" className="size-full object-cover" /> : initials(server.name)}
+          </span>
           <span className="flex-1 truncate">{server.name}</span>
           <ChevronDown className={`size-4 transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
         </button>
         {menuOpen && (
           <>
             <div className="fixed inset-0 z-30" onClick={() => setMenuOpen(false)} />
-            <div className="absolute top-12 right-2 left-2 z-40 rounded-lg border border-line bg-elevated p-1.5 shadow-pop">
+            <div className="anim-pop absolute top-12 right-2 left-2 z-40 rounded-lg border border-line bg-elevated p-1.5 shadow-pop">
               {menu
                 .filter((m) => m.show)
                 .map((m) => (

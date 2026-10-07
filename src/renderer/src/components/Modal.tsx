@@ -29,12 +29,12 @@ export function Modal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 grid place-items-center bg-black/55 p-4"
+      className="anim-fade fixed inset-0 z-50 grid place-items-center bg-black/55 p-4"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose()
       }}
     >
-      <div role="dialog" aria-modal className={`w-full ${width} overflow-hidden rounded-xl bg-elevated shadow-pop`}>
+      <div role="dialog" aria-modal className={`anim-pop w-full ${width} overflow-hidden rounded-xl bg-elevated shadow-pop`}>
         <div className="flex items-start justify-between gap-4 px-5 pt-5">
           <div>
             <h2 className="text-lg font-bold text-fg">{title}</h2>

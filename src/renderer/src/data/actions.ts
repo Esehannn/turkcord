@@ -113,6 +113,26 @@ export function useActions() {
           unwrap(await supabase.rpc('set_member_role', { p_server: serverId, p_user: userId, p_role: role }))
           await invalidate(keys.members(serverId))
         }),
+      createRole: (serverId: string, name: string, color: string) =>
+        run(async () => {
+          unwrap(await supabase.rpc('create_server_role', { p_server: serverId, p_name: name, p_color: color }))
+          await invalidate(keys.roles(serverId))
+        }),
+      updateRole: (serverId: string, roleId: string, name: string, color: string, position: number) =>
+        run(async () => {
+          unwrap(await supabase.rpc('update_server_role', { p_role: roleId, p_name: name, p_color: color, p_position: position }))
+          await invalidate(keys.roles(serverId))
+        }),
+      deleteRole: (serverId: string, roleId: string) =>
+        run(async () => {
+          unwrap(await supabase.rpc('delete_server_role', { p_role: roleId }))
+          await invalidate(keys.roles(serverId), keys.members(serverId))
+        }),
+      setMemberServerRole: (serverId: string, userId: string, roleId: string | null) =>
+        run(async () => {
+          unwrap(await supabase.rpc('set_member_server_role', { p_server: serverId, p_user: userId, p_role: roleId }))
+          await invalidate(keys.members(serverId))
+        }),
       createInvite: (serverId: string, maxUses: number | null, expiresHours: number | null) =>
         run(async () =>
           unwrap(

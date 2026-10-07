@@ -3,7 +3,7 @@ import { AtSign, Hash, Users } from 'lucide-react'
 import { Avatar, STATUS_LABEL } from '@/components/Avatar'
 import { EmptyState, IconButton, Spinner } from '@/components/ui'
 import { useActions } from '@/data/actions'
-import { useBlocks, useChannel, useDms, useMembers, useMessages, useProfiles, type ChatMessage } from '@/data/queries'
+import { useBlocks, useChannel, useDms, useMembers, useMessages, useProfiles, useServerRoles, type ChatMessage } from '@/data/queries'
 import { useTypingChannel } from '@/data/realtime'
 import { formatDay, isSameDay, sameGroup } from '@/lib/format'
 import { usePresence } from '@/stores/presence'
@@ -20,6 +20,7 @@ export function ChatView({ channelId, serverId }: { channelId: string; serverId?
   const { data: dms } = useDms()
   const { data: blocks = [] } = useBlocks()
   const { data: members = [] } = useMembers(serverId ?? null)
+  const { data: roles = [] } = useServerRoles(serverId ?? null)
   const messages = useMessages(channelId)
   const actions = useActions()
   const memberList = useUi((s) => s.memberList)
@@ -53,6 +54,17 @@ export function ChatView({ channelId, serverId }: { channelId: string; serverId?
     return () => window.removeEventListener('focus', onFocus)
   }, [actions, channelId, newest])
 
+  // Üyenin rol rengi (sohbette isim bu renkte görünür).
+  const nameColors = useMemo(() => {
+    const colorOf = new Map(roles.map((r) => [r.id, r.color]))
+    const map = new Map<string, string>()
+    for (const m of members) {
+      const color = m.role_id ? colorOf.get(m.role_id) : undefined
+      if (color) map.set(m.user_id, color)
+    }
+    return map
+  }, [members, roles])
+
   const profileName = useCallback((id: string) => profiles?.get(id)?.display_name ?? 'Biri', [profiles])
 
   const editLast = useCallback(() => {
@@ -72,6 +84,15 @@ export function ChatView({ channelId, serverId }: { channelId: string; serverId?
     observer.observe(el)
     return () => observer.disconnect()
   }, [fetchNextPage, hasNextPage, isFetchingNextPage])
+
+  // "@" ile etiketlenebilecekler: sunucu üyeleri ya da özel mesajdaki kişi.
+  const mentionables = useMemo(() => {
+    const ids = dm ? [dm.user_id] : members.map((m) => m.user_id)
+    return ids
+      .filter((id) => id !== me)
+      .map((id) => profiles?.get(id))
+      .filter((p): p is NonNullable<typeof p> => !!p)
+  }, [dm, members, me, profiles])
 
   const title = dm ? dm.display_name : (channel?.name ?? '')
   const placeholder = dm ? `@${dm.display_name} kişisine mesaj gönder` : `#${channel?.name ?? ''} kanalına mesaj gönder`
@@ -134,6 +155,7 @@ export function ChatView({ channelId, serverId }: { channelId: string; serverId?
                     onEdit={setEditing}
                     onReply={setReplyTo}
                     profileName={profileName}
+                    nameColor={message.author_id ? nameColors.get(message.author_id) : undefined}
                   />
                   {(!older || !isSameDay(older.created_at, message.created_at)) && <DayDivider iso={message.created_at} />}
                 </Fragment>
@@ -161,6 +183,7 @@ export function ChatView({ channelId, serverId }: { channelId: string; serverId?
         onCancelReply={() => setReplyTo(null)}
         onEditLast={editLast}
         onTyping={sendTyping}
+        mentionables={mentionables}
       />
     </section>
   )

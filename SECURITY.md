@@ -41,11 +41,14 @@ Bir güvenlik açığı bulursan lütfen herkese açık bir issue açma. GitHub'
 **Masaüstü uygulaması**
 
 - Pencere `contextIsolation`, `sandbox` açık ve `nodeIntegration` kapalı çalışır; arayüze sadece küçük bir köprü açılır.
-- Paketlenmiş uygulamada sıkı bir İçerik Güvenliği Politikası (CSP) vardır; uzak betik yüklenemez.
+- Paketlenmiş uygulamada sıkı bir İçerik Güvenliği Politikası (CSP) vardır; uzak betik yüklenemez. `wasm-unsafe-eval`
+  sadece uygulamanın içindeki gürültü engelleme modelinin (WebAssembly) derlenmesine izin verir; `eval` kapalıdır.
 - Mesajlar asla HTML olarak işlenmez; biçimlendirme güvenli React öğelerine çevrilir.
 - Bağlantılar uygulama içinde açılmaz, varsayılan tarayıcıya gönderilir (sadece http/https).
 - Oturum anahtarları Windows'un kullanıcıya özel şifrelemesiyle (DPAPI) korunan bir dosyada saklanır.
 - Electron Fuses ile `RunAsNode` gibi kötüye kullanılabilecek özellikler kapatılır ve asar bütünlüğü doğrulanır.
 - Mikrofon dışında kamera, konum gibi izinler reddedilir.
+- Her yerde çalışan kısayollar sadece kullanıcının seçtiği tuş kombinasyonlarını dinler (tuş kaydı yapılmaz);
+  ana süreç sadece `Ctrl/Alt/Shift + harf/rakam/F tuşu` biçimindeki kısayolları kabul eder.
 - Güncellemeler sadece bu reponun GitHub Releases sayfasından (HTTPS) indirilir; kurulumdan önce dosyanın SHA-512
   özeti `latest.yml` ile karşılaştırılır.

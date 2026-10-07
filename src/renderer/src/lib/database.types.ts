@@ -49,7 +49,18 @@ export type ServerMemberRow = {
   server_id: string
   user_id: string
   role: MemberRole
+  // Sunucuya özel, adlı ve renkli rol (görünüş için).
+  role_id: string | null
   joined_at: string
+}
+
+export type ServerRoleRow = {
+  id: string
+  server_id: string
+  name: string
+  color: string
+  position: number
+  created_at: string
 }
 
 export type ChannelKind = 'text' | 'voice' | 'dm'
@@ -141,6 +152,7 @@ export type Database = {
           },
         ]
       >
+      server_roles: Table<ServerRoleRow, never, never>
       channels: Table<ChannelRow, never, never>
       dm_members: Table<DmMemberRow, never, never>
       server_invites: Table<ServerInviteRow, never, never>
@@ -221,6 +233,10 @@ export type Database = {
       leave_server: { Args: { p_server: string }; Returns: undefined }
       kick_member: { Args: { p_server: string; p_user: string }; Returns: undefined }
       set_member_role: { Args: { p_server: string; p_user: string; p_role: 'admin' | 'member' }; Returns: undefined }
+      create_server_role: { Args: { p_server: string; p_name: string; p_color: string }; Returns: string }
+      update_server_role: { Args: { p_role: string; p_name: string; p_color: string; p_position: number }; Returns: undefined }
+      delete_server_role: { Args: { p_role: string }; Returns: undefined }
+      set_member_server_role: { Args: { p_server: string; p_user: string; p_role: string | null }; Returns: undefined }
       create_channel: { Args: { p_server: string; p_name: string; p_kind: 'text' | 'voice' }; Returns: string }
       update_channel: { Args: { p_channel: string; p_name: string; p_topic: string | null }; Returns: undefined }
       delete_channel: { Args: { p_channel: string }; Returns: undefined }

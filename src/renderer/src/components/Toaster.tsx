@@ -14,7 +14,7 @@ export function Toaster() {
         return (
           <div
             key={t.id}
-            className="pointer-events-auto flex items-start gap-3 rounded-lg border border-line bg-elevated p-3 text-sm shadow-pop"
+            className="anim-pop pointer-events-auto flex items-start gap-3 rounded-lg border border-line bg-elevated p-3 text-sm shadow-pop"
           >
             <Icon className={`mt-0.5 size-4 shrink-0 ${TONE[t.tone]}`} />
             <p className="flex-1 text-fg">{t.text}</p>

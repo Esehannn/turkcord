@@ -8,6 +8,7 @@ import type {
   ProfileRow,
   ReactionRow,
   ServerMemberRow,
+  ServerRoleRow,
   ServerRow,
 } from '@/lib/database.types'
 
@@ -20,6 +21,7 @@ export const keys = {
   channels: (serverId: string) => ['channels', serverId] as const,
   channel: (channelId: string) => ['channel', channelId] as const,
   members: (serverId: string) => ['members', serverId] as const,
+  roles: (serverId: string) => ['roles', serverId] as const,
   messages: (channelId: string) => ['messages', channelId] as const,
   unread: ['unread'] as const,
 }
@@ -121,6 +123,22 @@ export function useMembers(serverId: string | null) {
     enabled: !!serverId,
     queryFn: async (): Promise<ServerMemberRow[]> =>
       check(await supabase.from('server_members').select('*').eq('server_id', serverId!)),
+  })
+}
+
+export function useServerRoles(serverId: string | null) {
+  return useQuery({
+    queryKey: keys.roles(serverId ?? ''),
+    enabled: !!serverId,
+    queryFn: async (): Promise<ServerRoleRow[]> =>
+      check(
+        await supabase
+          .from('server_roles')
+          .select('*')
+          .eq('server_id', serverId!)
+          .order('position', { ascending: true })
+          .order('created_at', { ascending: true }),
+      ),
   })
 }
 

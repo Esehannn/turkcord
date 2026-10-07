@@ -16,7 +16,7 @@ export function EmojiPicker({ onPick, onClose }: { onPick: (emoji: string) => vo
   return (
     <>
       <div className="fixed inset-0 z-30" onClick={onClose} />
-      <div className="absolute right-0 bottom-full z-40 mb-2 w-80 rounded-lg border border-line bg-elevated p-2 shadow-pop">
+      <div className="anim-pop absolute right-0 bottom-full z-40 mb-2 w-80 rounded-lg border border-line bg-elevated p-2 shadow-pop">
         <div className="grid max-h-60 grid-cols-8 gap-0.5 overflow-y-auto scroll-thin">
           {EMOJIS.map((emoji) => (
             <button

@@ -32,4 +32,6 @@ export const voiceSounds = {
   leave: () => tones([880, 520]), // biri çıktı
   mute: () => tones([520], 0, 0.1, 0.07),
   unmute: () => tones([780], 0, 0.1, 0.07),
+  pttOn: () => tones([700], 0, 0.06, 0.035),
+  pttOff: () => tones([500], 0, 0.06, 0.03),
 }

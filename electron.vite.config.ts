@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { defineConfig, loadEnv } from 'electron-vite'
 import type { Plugin } from 'vite'
@@ -15,7 +16,8 @@ function contentSecurityPolicy(supabaseUrl: string): Plugin {
       const supabase = host ? `https://${host} wss://${host}` : ''
       const policy = [
         "default-src 'self'",
-        "script-src 'self'",
+        // wasm-unsafe-eval: sadece WebAssembly derlemeye izin verir (gürültü engelleme), eval'e değil.
+        "script-src 'self' 'wasm-unsafe-eval'",
         "style-src 'self' 'unsafe-inline'",
         "font-src 'self' data:",
         `img-src 'self' data: blob: ${host ? `https://${host}` : ''}`,
@@ -31,6 +33,20 @@ function contentSecurityPolicy(supabaseUrl: string): Plugin {
         '<meta charset="UTF-8" />',
         `<meta charset="UTF-8" />\n    <meta http-equiv="Content-Security-Policy" content="${policy}" />`,
       )
+    },
+  }
+}
+
+// "dosya.wasm?base64" içe aktarımı: wasm dosyası metin olarak koda gömülür. Paketlenmiş uygulamada
+// file:// adresinden fetch yapılamadığı için yapay zekâ gürültü engellemenin modeli böyle yüklenir.
+function wasmBase64(): Plugin {
+  return {
+    name: 'turkcord-wasm-base64',
+    enforce: 'pre',
+    load(id) {
+      if (!id.endsWith('.wasm?base64')) return null
+      const file = id.slice(0, -'?base64'.length)
+      return `export default ${JSON.stringify(readFileSync(file).toString('base64'))}`
     },
   }
 }
@@ -53,7 +69,7 @@ export default defineConfig(({ mode }) => {
           '@shared': resolve('src/shared'),
         },
       },
-      plugins: [react(), tailwindcss(), contentSecurityPolicy(env.VITE_SUPABASE_URL ?? '')],
+      plugins: [wasmBase64(), react(), tailwindcss(), contentSecurityPolicy(env.VITE_SUPABASE_URL ?? '')],
     },
   }
 })

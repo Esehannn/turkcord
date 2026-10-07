@@ -6,6 +6,7 @@ import { useUi } from '@/stores/ui'
 import { setUserVolume } from '@/voice/engine'
 import { watchVoiceRoom } from '@/voice/presence'
 import { useVoice } from '@/voice/store'
+import { PingBadge } from './Ping'
 
 // Ses kanalının altında o an kanalda olanlar. Konuşanın avatarı yeşil çerçeveyle parlar.
 export function VoiceRoom({ channelId, me }: { channelId: string; me: string }) {
@@ -13,6 +14,7 @@ export function VoiceRoom({ channelId, me }: { channelId: string; me: string }) 
   const speaking = useVoice((s) => s.speaking)
   const myChannel = useVoice((s) => s.channelId)
   const peers = useVoice((s) => s.peers)
+  const links = useVoice((s) => s.links)
   const { data: profiles } = useProfiles()
   const [menu, setMenu] = useState<string | null>(null)
 
@@ -35,12 +37,13 @@ export function VoiceRoom({ channelId, me }: { channelId: string; me: string }) 
               onClick={() => setMenu(menu === p.userId ? null : p.userId)}
               className="flex w-full items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm text-muted hover:bg-hover hover:text-fg"
             >
-              <span className={`rounded-full ring-2 transition-shadow ${talking ? 'ring-online' : 'ring-transparent'}`}>
+              <span className={`rounded-full ring-2 transition-shadow ${talking ? 'speaking-glow ring-online' : 'ring-transparent'}`}>
                 <Avatar name={name} path={profile?.avatar_path} size={22} />
               </span>
               <span className={`min-w-0 flex-1 truncate ${talking ? 'font-semibold text-fg' : ''} ${connecting ? 'opacity-60' : ''}`}>
                 {name}
               </span>
+              {inThisRoom && p.userId !== me && <PingBadge link={links[p.userId]} />}
               {p.muted && <MicOff className="size-3.5 shrink-0 text-accent" aria-label="Mikrofonu kapalı" />}
               {p.deafened && <HeadphoneOff className="size-3.5 shrink-0 text-accent" aria-label="Sağırlaştırılmış" />}
             </button>
@@ -58,7 +61,7 @@ function ParticipantMenu({ userId, isMe, onClose }: { userId: string; isMe: bool
   return (
     <>
       <div className="fixed inset-0 z-30" onClick={onClose} />
-      <div className="absolute top-full left-0 z-40 mt-1 w-56 rounded-lg border border-line bg-elevated p-3 shadow-pop">
+      <div className="anim-pop absolute top-full left-0 z-40 mt-1 w-56 rounded-lg border border-line bg-elevated p-3 shadow-pop">
         {!isMe && (
           <label className="block">
             <span className="flex justify-between text-xs font-semibold text-muted">
