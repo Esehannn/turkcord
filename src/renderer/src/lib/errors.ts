@@ -45,6 +45,9 @@ export function errorMessage(error: unknown): string {
   const code = /turkcord:([a-z_]+)/.exec(raw)?.[1] ?? (MESSAGES[raw] ? raw : undefined)
   if (code && MESSAGES[code]) return MESSAGES[code]
 
+  // Uygulamanın kendi yazdığı hazır Türkçe cümleler (ör. mikrofon hataları) olduğu gibi gösterilir.
+  if (typeof error === 'string' && /\s/.test(error)) return error
+
   for (const [pattern, message] of AUTH_MESSAGES) {
     if (pattern.test(raw)) return message
   }
