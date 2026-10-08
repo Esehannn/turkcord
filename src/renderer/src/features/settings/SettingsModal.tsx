@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Bell, KeyRound, LogOut, Mic, Monitor, Palette, ShieldCheck, User } from 'lucide-react'
+import { Bell, KeyRound, LogOut, Mic, Monitor, Palette, Play, ShieldCheck, Square, User } from 'lucide-react'
 import { Avatar } from '@/components/Avatar'
 import { confirmDialog, Modal } from '@/components/Modal'
 import { Button, Field, Input } from '@/components/ui'
@@ -8,6 +8,17 @@ import { useActions } from '@/data/actions'
 import { useProfile } from '@/data/queries'
 import { errorMessage } from '@/lib/errors'
 import { removeImage, uploadAvatar } from '@/lib/images'
+import { showNotification } from '@/lib/notify'
+import {
+  clearCustomRingtone,
+  customRingtone,
+  previewSound,
+  RINGTONES,
+  saveCustomRingtone,
+  startRingtone,
+  type NotifySound,
+  type Ringtone,
+} from '@/lib/sounds'
 import { supabase } from '@/lib/supabase'
 import { useSession } from '@/stores/session'
 import { toast } from '@/stores/toast'
@@ -208,21 +219,191 @@ function Toggle({ label, hint, checked, onChange }: { label: string; hint: strin
   )
 }
 
+const SOUND_SAMPLES: { sound: NotifySound; label: string }[] = [
+  { sound: 'message', label: 'Mesaj' },
+  { sound: 'mention', label: 'Etiket' },
+  { sound: 'friend', label: 'Arkadaşlık isteği' },
+]
+
 function NotificationsTab() {
   const notifications = useUi((s) => s.notifications)
+  const banners = useUi((s) => s.banners)
   const sounds = useUi((s) => s.sounds)
+  const volume = useUi((s) => s.volume)
+  const notifyAll = useUi((s) => s.notifyAll)
+  const effects = useUi((s) => s.effects)
   const setPrefs = useUi((s) => s.setPrefs)
   return (
-    <Section title="Bildirimler">
-      <Toggle
-        label="Masaüstü bildirimleri"
-        hint="Özel mesaj, etiketlenme ve arkadaşlık isteklerinde bildirim göster."
-        checked={notifications}
-        onChange={(v) => setPrefs({ notifications: v })}
+    <div className="space-y-8">
+      <Section title="Bildirimler">
+        <Toggle
+          label="Masaüstü bildirimleri"
+          hint="Turkcord arkadayken özel mesaj, etiketlenme, arama ve arkadaşlık isteklerinde Windows bildirimi göster."
+          checked={notifications}
+          onChange={(v) => setPrefs({ notifications: v })}
+        />
+        <Toggle
+          label="Uygulama içi bildirim kartları"
+          hint="Turkcord öndeyken başka bir sohbetten mesaj gelince sağ üstte kart göster."
+          checked={banners}
+          onChange={(v) => setPrefs({ banners: v })}
+        />
+        <Toggle
+          label="Sunucu kanallarındaki her mesajı bildir"
+          hint="Kapalıyken sunucularda sadece etiketlendiğin mesajlar bildirilir; diğerleri okunmamış olarak işaretlenir."
+          checked={notifyAll}
+          onChange={(v) => setPrefs({ notifyAll: v })}
+        />
+        <div className="flex justify-end">
+          <Button
+            variant="secondary"
+            onClick={() =>
+              showNotification({ title: 'Deneme bildirimi', body: 'Bildirimler böyle görünecek ve böyle ses çıkaracak.', sound: 'message', avatar: { name: 'Turkcord' } })
+            }
+          >
+            Bildirimi dene
+          </Button>
+        </div>
+      </Section>
+
+      <Section title="Sesler">
+        <Toggle
+          label="Bildirim sesleri"
+          hint="Mesaj, etiket, arkadaşlık isteği ve arama sesleri."
+          checked={sounds}
+          onChange={(v) => setPrefs({ sounds: v })}
+        />
+        <div className={`rounded-lg border border-line p-3 ${sounds ? '' : 'opacity-50'}`}>
+          <label className="block">
+            <span className="flex justify-between text-sm font-medium text-fg">
+              Ses seviyesi <span className="text-muted tabular-nums">%{Math.round(volume * 100)}</span>
+            </span>
+            <input
+              type="range"
+              min={5}
+              max={100}
+              step={5}
+              disabled={!sounds}
+              value={Math.round(volume * 100)}
+              onChange={(e) => setPrefs({ volume: Number(e.target.value) / 100 })}
+              onPointerUp={() => previewSound('message', volume)}
+              className="mt-2 w-full accent-[#e30a17]"
+            />
+          </label>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {SOUND_SAMPLES.map((sample) => (
+              <Button key={sample.sound} variant="secondary" disabled={!sounds} onClick={() => previewSound(sample.sound, volume)}>
+                <Play className="size-3.5" /> {sample.label}
+              </Button>
+            ))}
+          </div>
+        </div>
+        <Toggle
+          label="Ses efektlerini duy"
+          hint="Ses kanalında ya da aramada başkalarının bastığı efektler (korna, alkış…) sende de çalsın."
+          checked={effects}
+          onChange={(v) => setPrefs({ effects: v })}
+        />
+        <RingtonePicker />
+        <p className="text-xs text-faint">"Rahatsız Etmeyin" durumundayken bildirim ve ses gelmez; gelen aramalar sessizce gösterilir.</p>
+      </Section>
+    </div>
+  )
+}
+
+function RingtonePicker() {
+  const ringtone = useUi((s) => s.ringtone)
+  const setPrefs = useUi((s) => s.setPrefs)
+  const [hasCustom, setHasCustom] = useState(() => !!customRingtone())
+  const [playing, setPlaying] = useState(false)
+  const stopRef = useRef<(() => void) | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const stop = () => {
+    stopRef.current?.()
+    stopRef.current = null
+    setPlaying(false)
+  }
+  useEffect(() => () => stopRef.current?.(), [])
+
+  function toggle() {
+    if (playing) return stop()
+    stopRef.current = startRingtone(ringtone)
+    setPlaying(true)
+  }
+
+  function choose(value: Ringtone) {
+    stop()
+    if (value === 'ozel' && !hasCustom) {
+      fileRef.current?.click()
+      return
+    }
+    setPrefs({ ringtone: value })
+  }
+
+  async function pick(file: File) {
+    try {
+      await saveCustomRingtone(file)
+      setHasCustom(true)
+      setPrefs({ ringtone: 'ozel' })
+      toast.success('Arama melodin kaydedildi.')
+    } catch (error) {
+      toast.info(error instanceof Error ? error.message : 'Melodi kaydedilemedi.')
+    }
+  }
+
+  return (
+    <div className="rounded-lg border border-line p-3">
+      <p className="text-sm font-medium text-fg">Arama melodisi</p>
+      <p className="text-xs text-muted">Biri seni aradığında çalar. Kendi ses dosyanı (mp3, ogg, wav; en fazla 1,5 MB) da seçebilirsin.</p>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        {RINGTONES.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => choose(option.value)}
+            className={`rounded-md border px-3 py-1.5 text-sm font-medium transition-colors ${
+              ringtone === option.value ? 'border-accent bg-accent-soft text-fg' : 'border-line text-muted hover:border-faint hover:text-fg'
+            }`}
+          >
+            {option.label}
+          </button>
+        ))}
+        <Button variant="secondary" onClick={toggle}>
+          {playing ? <Square className="size-3.5" /> : <Play className="size-3.5" />} {playing ? 'Durdur' : 'Dinle'}
+        </Button>
+      </div>
+      {hasCustom && (
+        <div className="mt-2 flex gap-3 text-xs">
+          <button type="button" className="text-muted hover:text-fg hover:underline" onClick={() => fileRef.current?.click()}>
+            Dosyayı değiştir
+          </button>
+          <button
+            type="button"
+            className="text-accent hover:underline"
+            onClick={() => {
+              stop()
+              clearCustomRingtone()
+              setHasCustom(false)
+              if (ringtone === 'ozel') setPrefs({ ringtone: 'mehter' })
+            }}
+          >
+            Dosyayı kaldır
+          </button>
+        </div>
+      )}
+      <input
+        ref={fileRef}
+        type="file"
+        accept="audio/*"
+        hidden
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          if (file) void pick(file)
+          e.target.value = ''
+        }}
       />
-      <Toggle label="Bildirim sesi" hint="Yeni mesajda kısa bir ses çal." checked={sounds} onChange={(v) => setPrefs({ sounds: v })} />
-      <p className="text-xs text-faint">"Rahatsız Etmeyin" durumundayken bildirim ve ses gelmez.</p>
-    </Section>
+    </div>
   )
 }
 

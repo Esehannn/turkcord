@@ -21,7 +21,8 @@ function contentSecurityPolicy(supabaseUrl: string): Plugin {
         "style-src 'self' 'unsafe-inline'",
         "font-src 'self' data:",
         `img-src 'self' data: blob: ${host ? `https://${host}` : ''}`,
-        "media-src 'self' blob: mediastream:",
+        // Sohbete gönderilen ses ve video dosyaları Supabase'in geçici bağlantılarından oynatılır.
+        `media-src 'self' blob: data: mediastream: ${host ? `https://${host}` : ''}`,
         `connect-src 'self' ${supabase} stun: turn: turns:`,
         "object-src 'none'",
         "base-uri 'none'",

@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Logo, Wordmark } from '@/components/Logo'
 import { ConfirmHost } from '@/components/Modal'
+import { TitleBar } from '@/components/TitleBar'
 import { Toaster } from '@/components/Toaster'
 import { UpdateBanner } from '@/components/UpdateBanner'
 import { Splash } from '@/components/Splash'
@@ -25,6 +26,7 @@ export function App() {
 
   return (
     <div className="flex h-full flex-col">
+      <TitleBar />
       <UpdateBanner />
       <div className="min-h-0 flex-1">{screen}</div>
       <ConfirmHost />

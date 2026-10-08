@@ -1,5 +1,5 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
-import { Check, MessageCircle, UserMinus, UserPlus, Users, X } from 'lucide-react'
+import { Check, MessageCircle, Phone, UserMinus, UserPlus, Users, X } from 'lucide-react'
 import { Avatar, STATUS_LABEL } from '@/components/Avatar'
 import { confirmDialog } from '@/components/Modal'
 import { Badge, Button, EmptyState, IconButton, Input } from '@/components/ui'
@@ -9,6 +9,7 @@ import type { ProfileRow } from '@/lib/database.types'
 import { usePresence } from '@/stores/presence'
 import { useSession } from '@/stores/session'
 import { useUi, type FriendsTab } from '@/stores/ui'
+import { startCall } from '@/voice/call'
 
 export function FriendsView() {
   const view = useUi((s) => s.view)
@@ -150,6 +151,16 @@ function FriendList({ tab, me }: { tab: 'online' | 'all' | 'pending'; me: string
                 <>
                   <IconButton label="Mesaj gönder" onClick={() => void actions.openDm(profile.id)}>
                     <MessageCircle className="size-5" />
+                  </IconButton>
+                  <IconButton
+                    label="Sesli ara"
+                    className="hover:text-success"
+                    onClick={async () => {
+                      const channelId = await actions.openDm(profile.id).catch(() => null)
+                      if (channelId) void startCall(channelId, profile.id)
+                    }}
+                  >
+                    <Phone className="size-5" />
                   </IconButton>
                   <IconButton
                     label="Arkadaşlıktan çıkar"

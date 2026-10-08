@@ -1,15 +1,18 @@
-import { memo, useEffect, useRef, useState, type KeyboardEvent } from 'react'
-import { CornerUpLeft, Pencil, SmilePlus, Trash2 } from 'lucide-react'
+import { memo, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
+import { Check, Copy, CornerUpLeft, Pencil, Phone, PhoneMissed, PhoneOff, SmilePlus, Trash2, type LucideIcon } from 'lucide-react'
 import { Avatar } from '@/components/Avatar'
 import { confirmDialog } from '@/components/Modal'
 import { IconButton, TextArea } from '@/components/ui'
 import { useActions } from '@/data/actions'
 import type { ChatMessage } from '@/data/queries'
 import type { ProfileRow } from '@/lib/database.types'
+import { callText, fileKind, parseCall } from '@/lib/files'
 import { formatMessageTime, formatTime } from '@/lib/format'
-import { signedAttachmentUrl } from '@/lib/images'
 import { mentionsUser } from '@/lib/markdown'
+import { toast } from '@/stores/toast'
 import { useUi } from '@/stores/ui'
+import { Attachments } from './Attachments'
 import { EmojiPicker, QUICK_REACTIONS } from './EmojiPicker'
 import { MessageContent } from './MessageContent'
 
@@ -28,6 +31,27 @@ type Props = {
   profileName: (id: string) => string
   // Yazarın sunucu rolünün rengi.
   nameColor?: string
+  // Özel mesajda arama kaydının yanındaki "Geri ara" düğmesi.
+  onCallBack?: () => void
+}
+
+// Yanıtlanan mesajın tek satırlık özeti.
+export function previewText(message: ChatMessage, mine: boolean): string {
+  if (message.kind === 'call') return `📞 ${callText(message.content, mine)}`
+  if (message.content) return message.content
+  const first = message.attachments[0]
+  if (!first) return ''
+  return fileKind(first) === 'image' ? '🖼️ Görsel' : `📎 ${first.name ?? 'Dosya'}`
+}
+
+async function copyText(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text)
+    return true
+  } catch {
+    toast.info('Kopyalanamadı.')
+    return false
+  }
 }
 
 export const MessageItem = memo(function MessageItem({
@@ -44,14 +68,23 @@ export const MessageItem = memo(function MessageItem({
   onReply,
   profileName,
   nameColor,
+  onCallBack,
 }: Props) {
   const actions = useActions()
   const openModal = useUi((s) => s.openModal)
   const [picker, setPicker] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const [menu, setMenu] = useState<{ x: number; y: number; selection: string } | null>(null)
+  // Az önce gelen mesaj hafif bir animasyonla belirir (eski mesajlar yüklenirken değil).
+  const [fresh] = useState(() => Date.now() - new Date(message.created_at).getTime() < 4000)
   const mine = message.author_id === me.id
-  const mentioned = !mine && mentionsUser(message.content, me.username)
+  const mentioned = !mine && message.kind === 'text' && mentionsUser(message.content, me.username)
   const name = author?.display_name ?? 'Silinmiş kullanıcı'
   const showHeader = !grouped || !!message.reply_to
+
+  if (message.kind === 'call') {
+    return <CallMessage message={message} mine={mine} name={name} fresh={fresh} onCallBack={onCallBack} />
+  }
 
   const reactionGroups = groupReactions(message.reactions, me.id)
 
@@ -67,11 +100,35 @@ export const MessageItem = memo(function MessageItem({
     }
   }
 
+  const copy = async (text = message.content) => {
+    if (!(await copyText(text))) return
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
+
+  // Sağ tık menüsü. Bağlantıların üzerinde Windows'un kendi menüsü (aç / kopyala) açılır.
+  const onContextMenu = (e: MouseEvent) => {
+    if (editing || (e.target as HTMLElement).closest('a, input, textarea')) return
+    e.preventDefault()
+    setMenu({ x: e.clientX, y: e.clientY, selection: window.getSelection()?.toString().trim() ?? '' })
+  }
+
+  const menuItems: MenuItem[] = menu
+    ? [
+        { label: 'Seçimi kopyala', icon: Copy, show: !!menu.selection, onClick: () => void copy(menu.selection) },
+        { label: 'Metni kopyala', icon: Copy, show: !!message.content, onClick: () => void copy() },
+        { label: 'Yanıtla', icon: CornerUpLeft, show: canPost, onClick: () => onReply(message) },
+        { label: 'Düzenle', icon: Pencil, show: canPost && mine && !!message.content, onClick: () => onEdit(message.id) },
+        { label: 'Sil', icon: Trash2, show: mine || canModerate, danger: true, onClick: () => void remove() },
+      ].filter((item) => item.show)
+    : []
+
   return (
     <div
       id={`mesaj-${message.id}`}
-      className={`group relative px-4 ${showHeader ? 'mt-3 pt-1' : ''} py-0.5 ${
-        mentioned ? 'border-l-2 border-accent bg-mention' : 'border-l-2 border-transparent hover:bg-hover'
+      onContextMenu={onContextMenu}
+      className={`group relative px-4 ${showHeader ? 'mt-3 pt-1' : ''} py-0.5 ${fresh ? 'anim-msg' : ''} ${
+        mentioned ? 'border-l-2 border-accent bg-mention' : `border-l-2 border-transparent hover:bg-hover ${menu ? 'bg-hover' : ''}`
       }`}
     >
       {message.reply_to && (
@@ -84,7 +141,7 @@ export const MessageItem = memo(function MessageItem({
           {replied ? (
             <>
               <span className="font-semibold">{repliedAuthor?.display_name ?? 'Silinmiş kullanıcı'}</span>
-              <span className="truncate">{replied.content || '📎 Görsel'}</span>
+              <span className="truncate">{previewText(replied, replied.author_id === me.id)}</span>
             </>
           ) : (
             <span className="italic">Yanıtlanan mesaj yüklenmedi ya da silindi</span>
@@ -130,13 +187,7 @@ export const MessageItem = memo(function MessageItem({
             )
           )}
 
-          {message.attachments.length > 0 && (
-            <div className="mt-1 flex flex-wrap gap-2">
-              {message.attachments.map((a) => (
-                <AttachmentImage key={a.path} path={a.path} width={a.width} height={a.height} />
-              ))}
-            </div>
-          )}
+          <Attachments items={message.attachments} />
 
           {reactionGroups.length > 0 && (
             <div className="mt-1 flex flex-wrap gap-1">
@@ -160,23 +211,33 @@ export const MessageItem = memo(function MessageItem({
         </div>
       </div>
 
-      {!editing && canPost && (
+      {!editing && (canPost || !!message.content) && (
         <div className="absolute -top-4 right-4 hidden items-center rounded-md border border-line bg-elevated shadow-pop group-hover:flex">
-          {QUICK_REACTIONS.slice(0, 4).map((emoji) => (
-            <button key={emoji} type="button" onClick={() => react(emoji)} className="grid size-8 place-items-center text-base hover:bg-hover">
-              {emoji}
-            </button>
-          ))}
-          <div className="relative">
-            <IconButton label="Tepki ekle" onClick={() => setPicker(true)}>
-              <SmilePlus className="size-4" />
+          {canPost &&
+            QUICK_REACTIONS.slice(0, 4).map((emoji) => (
+              <button key={emoji} type="button" onClick={() => react(emoji)} className="grid size-8 place-items-center text-base hover:bg-hover">
+                {emoji}
+              </button>
+            ))}
+          {canPost && (
+            <div className="relative">
+              <IconButton label="Tepki ekle" onClick={() => setPicker(true)}>
+                <SmilePlus className="size-4" />
+              </IconButton>
+              {picker && <EmojiPicker onPick={react} onClose={() => setPicker(false)} />}
+            </div>
+          )}
+          {canPost && (
+            <IconButton label="Yanıtla" onClick={() => onReply(message)}>
+              <CornerUpLeft className="size-4" />
             </IconButton>
-            {picker && <EmojiPicker onPick={react} onClose={() => setPicker(false)} />}
-          </div>
-          <IconButton label="Yanıtla" onClick={() => onReply(message)}>
-            <CornerUpLeft className="size-4" />
-          </IconButton>
-          {mine && (
+          )}
+          {message.content && (
+            <IconButton label={copied ? 'Kopyalandı' : 'Metni kopyala'} onClick={() => void copy()}>
+              {copied ? <Check className="size-4 text-success" /> : <Copy className="size-4" />}
+            </IconButton>
+          )}
+          {canPost && mine && message.content && (
             <IconButton label="Düzenle" onClick={() => onEdit(message.id)}>
               <Pencil className="size-4" />
             </IconButton>
@@ -188,9 +249,94 @@ export const MessageItem = memo(function MessageItem({
           )}
         </div>
       )}
+
+      {menu && menuItems.length > 0 && <ContextMenu x={menu.x} y={menu.y} items={menuItems} onClose={() => setMenu(null)} />}
     </div>
   )
 })
+
+type MenuItem = { label: string; icon: LucideIcon; show: boolean; danger?: boolean; onClick: () => void }
+
+function ContextMenu({ x, y, items, onClose }: { x: number; y: number; items: MenuItem[]; onClose: () => void }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState({ left: x, top: y })
+
+  // Menü pencerenin dışına taşmasın.
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const { width, height } = el.getBoundingClientRect()
+    setPos({ left: Math.max(8, Math.min(x, window.innerWidth - width - 8)), top: Math.max(40, Math.min(y, window.innerHeight - height - 8)) })
+  }, [x, y])
+
+  useEffect(() => {
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    window.addEventListener('blur', onClose)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('blur', onClose)
+    }
+  }, [onClose])
+
+  return createPortal(
+    <>
+      <div
+        className="fixed inset-0 z-50"
+        onClick={onClose}
+        onContextMenu={(e) => {
+          e.preventDefault()
+          onClose()
+        }}
+      />
+      <div ref={ref} role="menu" style={pos} className="anim-pop fixed z-50 w-52 rounded-lg border border-line bg-elevated p-1.5 shadow-pop">
+        {items.map((item) => (
+          <button
+            key={item.label}
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              onClose()
+              item.onClick()
+            }}
+            className={`flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-sm font-medium hover:bg-hover ${
+              item.danger ? 'text-accent' : 'text-fg'
+            }`}
+          >
+            {item.label}
+            <item.icon className="size-4" />
+          </button>
+        ))}
+      </div>
+    </>,
+    document.body,
+  )
+}
+
+// Arama kaydı: sohbetin ortasında, ince bir bilgi satırı.
+function CallMessage({ message, mine, name, fresh, onCallBack }: { message: ChatMessage; mine: boolean; name: string; fresh: boolean; onCallBack?: () => void }) {
+  const call = parseCall(message.content)
+  const missed = call.status !== 'ended'
+  const Icon = call.status === 'missed' ? PhoneMissed : call.status === 'declined' ? PhoneOff : Phone
+  let detail: ReactNode = callText(message.content, mine)
+  if (call.status === 'missed' && !mine) detail = <><strong className="font-semibold">{name}</strong> seni aradı</>
+  return (
+    <div id={`mesaj-${message.id}`} className={`mx-4 mt-3 flex items-center gap-3 rounded-lg border border-line bg-sidebar px-3 py-2 ${fresh ? 'anim-msg' : ''}`}>
+      <span className={`grid size-8 shrink-0 place-items-center rounded-full ${missed ? 'bg-accent-soft text-accent' : 'bg-hover text-success'}`}>
+        <Icon className="size-4" />
+      </span>
+      <span className="min-w-0 flex-1 text-sm text-fg">{detail}</span>
+      <span className="shrink-0 text-xs text-faint">{formatMessageTime(message.created_at)}</span>
+      {onCallBack && missed && !mine && (
+        <button type="button" onClick={onCallBack} className="shrink-0 rounded-md bg-accent px-2.5 py-1 text-xs font-bold text-on-accent hover:bg-accent-hover">
+          Geri ara
+        </button>
+      )}
+    </div>
+  )
+}
 
 function groupReactions(reactions: ChatMessage['reactions'], me: string) {
   const map = new Map<string, { emoji: string; users: string[]; mine: boolean }>()
@@ -243,35 +389,5 @@ function EditBox({ message, onDone }: { message: ChatMessage; onDone: () => void
         Kaydetmek için <kbd className="font-semibold">Enter</kbd>, vazgeçmek için <kbd className="font-semibold">Esc</kbd>
       </p>
     </div>
-  )
-}
-
-function AttachmentImage({ path, width, height }: { path: string; width?: number; height?: number }) {
-  const [url, setUrl] = useState<string | null>(null)
-  const [open, setOpen] = useState(false)
-  useEffect(() => {
-    let alive = true
-    void signedAttachmentUrl(path).then((u) => alive && setUrl(u))
-    return () => {
-      alive = false
-    }
-  }, [path])
-
-  const maxW = 400
-  const maxH = 300
-  const scale = width && height ? Math.min(1, maxW / width, maxH / height) : 1
-  const style = width && height ? { width: Math.round(width * scale), height: Math.round(height * scale) } : { width: 240, height: 160 }
-
-  return (
-    <>
-      <button type="button" onClick={() => url && setOpen(true)} className="overflow-hidden rounded-lg bg-input" style={style}>
-        {url && <img src={url} alt="Gönderilen görsel" className="size-full object-cover" loading="lazy" draggable={false} />}
-      </button>
-      {open && url && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/80 p-8" onClick={() => setOpen(false)}>
-          <img src={url} alt="Gönderilen görsel" className="max-h-full max-w-full rounded-lg shadow-pop" />
-        </div>
-      )}
-    </>
   )
 }

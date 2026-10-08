@@ -1,11 +1,12 @@
 import { useState, type FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Copy, KeyRound, ShieldCheck, ShieldOff, Trash2, UserX, UserCheck } from 'lucide-react'
+import { Copy, HardDrive, KeyRound, ShieldCheck, ShieldOff, Trash2, UserX, UserCheck } from 'lucide-react'
 import { Avatar } from '@/components/Avatar'
 import { confirmDialog, Modal } from '@/components/Modal'
 import { Button, Field, IconButton, Input, Tabs } from '@/components/ui'
 import { keys, useProfiles } from '@/data/queries'
 import { errorMessage, functionErrorCode } from '@/lib/errors'
+import { formatBytes } from '@/lib/files'
 import { formatMessageTime } from '@/lib/format'
 import { supabase } from '@/lib/supabase'
 import { useSession } from '@/stores/session'
@@ -13,7 +14,7 @@ import { toast } from '@/stores/toast'
 import { checkPassword, PASSWORD_MESSAGES } from '@shared/password'
 
 export function AdminPanel() {
-  const [tab, setTab] = useState<'invites' | 'users'>('invites')
+  const [tab, setTab] = useState<'invites' | 'users' | 'storage'>('invites')
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -24,10 +25,13 @@ export function AdminPanel() {
           options={[
             { value: 'invites', label: 'Davet kodları' },
             { value: 'users', label: 'Kullanıcılar' },
+            { value: 'storage', label: 'Depolama' },
           ]}
         />
       </div>
-      {tab === 'invites' ? <Invites /> : <Users />}
+      {tab === 'invites' && <Invites />}
+      {tab === 'users' && <Users />}
+      {tab === 'storage' && <Storage />}
     </div>
   )
 }
@@ -143,6 +147,123 @@ async function callAdmin<T>(body: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.functions.invoke('yonetici', { body })
   if (error) throw new Error(errorMessage((await functionErrorCode(error)) ?? error))
   return data as T
+}
+
+// Ücretsiz Supabase planının toplam dosya alanı.
+const STORAGE_LIMIT = 1024 * 1024 * 1024
+const CLEANUP_KEY = 'turkcord-son-temizlik'
+const DAY_MS = 24 * 60 * 60 * 1000
+
+type CleanupResult = { removed: number; more: boolean }
+
+// 30 günden eski ve 5 MB'tan büyük ekleri siler (mesajlar kalır, dosya "artık yok" görünür).
+export async function cleanupOldFiles(): Promise<CleanupResult> {
+  const result = await callAdmin<CleanupResult>({ action: 'cleanup_files' })
+  try {
+    localStorage.setItem(CLEANUP_KEY, String(Date.now()))
+  } catch {
+    // önemli değil
+  }
+  return result
+}
+
+// Yöneticinin uygulaması açıkken günde bir kez kendiliğinden çalışır.
+export function autoCleanupOldFiles(): void {
+  let last = 0
+  try {
+    last = Number(localStorage.getItem(CLEANUP_KEY) ?? 0)
+  } catch {
+    // önemli değil
+  }
+  if (Date.now() - last < DAY_MS) return
+  void cleanupOldFiles().catch(() => {})
+}
+
+function Storage() {
+  const qc = useQueryClient()
+  const [busy, setBusy] = useState(false)
+  const usage = useQuery({
+    queryKey: ['admin-storage'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('admin_storage_usage')
+      if (error) throw error
+      return data
+    },
+  })
+
+  const rows = usage.data ?? []
+  const of = (bucket: string) => rows.find((r) => r.bucket === bucket) ?? { bucket, files: 0, bytes: 0 }
+  const files = of('ekler')
+  const images = of('gorseller')
+  const total = files.bytes + images.bytes
+  const percent = Math.min(100, (total / STORAGE_LIMIT) * 100)
+  const tone = percent > 85 ? 'bg-accent' : percent > 60 ? 'bg-idle' : 'bg-online'
+
+  async function cleanup() {
+    if (
+      !(await confirmDialog({
+        title: 'Eski dosyaları temizle',
+        text: '30 günden eski ve 5 MB\'tan büyük dosya ekleri kalıcı olarak silinecek. Mesajlar ve küçük dosyalar kalır.',
+        confirmLabel: 'Temizle',
+      }))
+    )
+      return
+    setBusy(true)
+    try {
+      const result = await cleanupOldFiles()
+      toast.success(result.removed ? `${result.removed} dosya silindi.${result.more ? ' Daha fazlası için tekrar çalıştır.' : ''}` : 'Silinecek eski dosya yok.')
+      void qc.invalidateQueries({ queryKey: ['admin-storage'] })
+    } catch (error) {
+      toast.error(error)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      {usage.isError && <p className="text-sm text-accent">{errorMessage(usage.error)}</p>}
+      <div className="rounded-lg border border-line p-4">
+        <div className="flex items-center gap-3">
+          <div className="grid size-10 shrink-0 place-items-center rounded-md bg-accent-soft text-accent">
+            <HardDrive className="size-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-fg">
+              {formatBytes(total)} <span className="font-normal text-muted">/ {formatBytes(STORAGE_LIMIT)} kullanılıyor</span>
+            </p>
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-input">
+              <div className={`h-full rounded-full transition-[width] ${tone}`} style={{ width: `${Math.max(percent, total > 0 ? 1 : 0)}%` }} />
+            </div>
+          </div>
+        </div>
+        <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
+          <div className="rounded-md bg-input p-3">
+            <dt className="text-xs text-muted">Mesaj ekleri</dt>
+            <dd className="font-semibold text-fg">{formatBytes(files.bytes)}</dd>
+            <dd className="text-xs text-faint">{files.files} dosya</dd>
+          </div>
+          <div className="rounded-md bg-input p-3">
+            <dt className="text-xs text-muted">Avatar ve sunucu simgeleri</dt>
+            <dd className="font-semibold text-fg">{formatBytes(images.bytes)}</dd>
+            <dd className="text-xs text-faint">{images.files} dosya</dd>
+          </div>
+        </dl>
+      </div>
+      <div className="rounded-lg border border-line p-4">
+        <p className="text-sm font-medium text-fg">Otomatik temizlik</p>
+        <p className="mt-1 text-xs text-muted">
+          30 günden eski ve 5 MB'tan büyük dosya ekleri, bir yöneticinin Turkcord'u açıkken günde bir kez kendiliğinden silinir. Görseller ve küçük dosyalar
+          silinmez. İstersen şimdi de çalıştırabilirsin.
+        </p>
+        <div className="mt-3 flex justify-end">
+          <Button variant="secondary" loading={busy} onClick={() => void cleanup()}>
+            Şimdi temizle
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function Users() {

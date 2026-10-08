@@ -1,7 +1,16 @@
 import { app, ipcMain, nativeImage, powerMonitor, type BrowserWindow } from 'electron'
+import { setTrayUnread } from './desktop'
 import { isTrustedSender } from './security'
 
 const BADGE_PREFIX = 'data:image/png;base64,'
+export const TITLE_BAR_HEIGHT = 32
+
+// Başlık çubuğundaki Windows düğmelerinin (küçült, büyüt, kapat) renkleri; arayüzdeki çubukla aynı.
+export function titleBarOverlay(theme: 'light' | 'dark'): Electron.TitleBarOverlayOptions {
+  return theme === 'dark'
+    ? { color: '#121214', symbolColor: '#f2f2f3', height: TITLE_BAR_HEIGHT }
+    : { color: '#e30a17', symbolColor: '#ffffff', height: TITLE_BAR_HEIGHT }
+}
 
 export function registerWindowIpc(getWindow: () => BrowserWindow | null): void {
   ipcMain.handle('app:version', (event) => (isTrustedSender(event) ? app.getVersion() : null))
@@ -21,8 +30,43 @@ export function registerWindowIpc(getWindow: () => BrowserWindow | null): void {
     if (process.platform !== 'win32' || !win || !isTrustedSender(event) || typeof count !== 'number') return
     if (count <= 0 || typeof dataUrl !== 'string' || !dataUrl.startsWith(BADGE_PREFIX) || dataUrl.length > 20_000) {
       win.setOverlayIcon(null, '')
+      setTrayUnread(0, null)
       return
     }
-    win.setOverlayIcon(nativeImage.createFromDataURL(dataUrl), `${count} okunmamış`)
+    const image = nativeImage.createFromDataURL(dataUrl)
+    win.setOverlayIcon(image, `${count} okunmamış`)
+    // Pencere tepsideyken de okunmamış olduğu görülsün.
+    setTrayUnread(count, image)
+  })
+
+  // Tema değişince başlık çubuğu düğmelerinin rengi de değişir.
+  ipcMain.on('pencere:tema', (event, theme: unknown) => {
+    const win = getWindow()
+    if (process.platform !== 'win32' || !win || !isTrustedSender(event) || (theme !== 'light' && theme !== 'dark')) return
+    try {
+      win.setTitleBarOverlay(titleBarOverlay(theme))
+    } catch {
+      // Başlık çubuğu özelleştirilmemişse (ör. başka platform) yok sayılır.
+    }
+  })
+
+  // Gelen arama: pencere tepsideyse odağı çalmadan gösterilir ve görev çubuğunda yanıp söner.
+  ipcMain.on('pencere:dikkat', (event) => {
+    const win = getWindow()
+    if (!win || !isTrustedSender(event)) return
+    if (!win.isVisible()) win.showInactive()
+    if (!win.isFocused()) {
+      win.flashFrame(true)
+      win.once('focus', () => win.flashFrame(false))
+    }
+  })
+
+  // Bildirime tıklanınca pencere tepsiden de olsa öne gelir.
+  ipcMain.on('pencere:goster', (event) => {
+    const win = getWindow()
+    if (!win || !isTrustedSender(event)) return
+    if (win.isMinimized()) win.restore()
+    win.show()
+    win.focus()
   })
 }

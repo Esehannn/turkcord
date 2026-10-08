@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { EffectId } from '@/lib/sounds'
 
 export type VoiceParticipant = { userId: string; muted: boolean; deafened: boolean }
 export type VoiceStatus = 'idle' | 'connecting' | 'connected'
@@ -38,6 +39,8 @@ type VoiceState = VoicePrefs & {
   // Kişi başı bağlantı durumu ve gecikme.
   peers: Record<string, RTCPeerConnectionState>
   links: Record<string, PeerLink>
+  // Kanalda en son çalınan ses efekti (kimin bastığını göstermek için).
+  lastEffect: { userId: string; id: EffectId; at: number } | null
   setPrefs: (prefs: Partial<VoicePrefs>) => void
 }
 
@@ -93,6 +96,7 @@ export const useVoice = create<VoiceState>((set, get) => ({
   rooms: {},
   peers: {},
   links: {},
+  lastEffect: null,
   setPrefs: (prefs) => {
     set(prefs)
     const state = get()

@@ -98,7 +98,8 @@ export function Badge({ count, className = '' }: { count: number; className?: st
   if (count <= 0) return null
   return (
     <span
-      className={`inline-grid h-4 min-w-4 place-items-center rounded-full bg-accent px-1 text-[10px] leading-none font-bold text-white ${className}`}
+      key={count}
+      className={`anim-bump inline-grid h-[18px] min-w-[18px] place-items-center rounded-full bg-accent px-1 text-[11px] leading-none font-bold text-white ${className}`}
     >
       {count > 99 ? '99+' : count}
     </span>
@@ -137,7 +138,7 @@ export function Tabs<T extends string>({
 export function EmptyState({ icon, title, text }: { icon?: ReactNode; title: string; text?: string }) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
-      {icon && <div className="text-faint">{icon}</div>}
+      {icon && <div className="grid size-24 place-items-center rounded-full bg-accent-soft text-accent">{icon}</div>}
       <p className="font-semibold text-fg">{title}</p>
       {text && <p className="max-w-sm text-sm text-muted">{text}</p>}
     </div>

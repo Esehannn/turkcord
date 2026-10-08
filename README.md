@@ -21,11 +21,15 @@ Sunucu tarafında [Supabase](https://supabase.com) kullanır ve ücretsiz planla
 | ✅ | Arkadaş ekleme, istekler, engelleme |
 | ✅ | Özel mesajlar (DM) |
 | ✅ | Sunucu kurma, sunucu fotoğrafı, davet kodlarıyla katılma, yetkiler (sahip / yönetici / üye) ve renkli özel roller |
-| ✅ | Yazı kanalları: anlık mesajlar, yanıtlama, düzenleme, silme, emoji tepkileri, görsel gönderme |
+| ✅ | Yazı kanalları: anlık mesajlar, yanıtlama, düzenleme, silme, kopyalama, emoji tepkileri |
+| ✅ | Dosya gönderme: görsel, ses, video ve her tür dosya (25 MB'a kadar), sürükle-bırak, yükleme ilerlemesi |
 | ✅ | Biçimlendirme (**kalın**, *italik*, `kod`, spoiler), otomatik tamamlamalı @etiketleme, "yazıyor…" göstergesi |
-| ✅ | Okunmamış rozetleri, masaüstü bildirimleri, açık ve koyu tema |
-| ✅ | Yönetici paneli: davet kodları, şifre sıfırlama, hesap askıya alma |
+| ✅ | Bildirimler: ayarlanabilir sesler, uygulama içi bildirim kartları, masaüstü bildirimleri, okunmamış rozetleri |
+| ✅ | "Yeni mesajlar" çizgisi, en alta in düğmesi, açık ve koyu tema, kendi başlık çubuğu |
+| ✅ | Yönetici paneli: davet kodları, şifre sıfırlama, hesap askıya alma, depolama kullanımı ve temizlik |
 | ✅ | Sesli sohbet: P2P WebRTC, konuşan göstergesi, ping göstergesi, susturma/sağırlaştırma, kişi başı ses ayarı, cihaz seçimi |
+| ✅ | Bireysel sesli arama: özel mesajdan arama, mehter arama melodisi (ya da kendi ses dosyan), cevapsız arama kaydı |
+| ✅ | Ses efektleri: ses kanalında ya da aramada herkese çalan korna, alkış, ba-dum-tıss… |
 | ✅ | Yapay zekâ gürültü engelleme (RNNoise), giriş hassasiyeti, yankı engelleme, bas-konuş |
 | ✅ | Otomatik güncelleme (yeni sürüm arka planda iner, tek tıkla kurulur) |
 | ✅ | Sistem tepsisi, Windows açılışında başlatma, oyundayken de çalışan mikrofon/sağırlaştırma kısayolları |
@@ -50,7 +54,7 @@ npm run dev            # uygulamayı geliştirme modunda açar
 | Komut | Ne yapar |
 |---|---|
 | `npm run typecheck` | TypeScript kontrolü |
-| `npm test` | Birim testleri (biçimlendirme, şifre ve kullanıcı adı kuralları) |
+| `npm test` | Birim testleri (biçimlendirme, şifre ve kullanıcı adı kuralları, dosya ve arama yardımcıları) |
 | `npm run test:db` | Migration'ları boş bir Postgres'e kurup güvenlik (RLS) testlerini çalıştırır. `TEST_DATABASE_URL` gerekir. |
 | `npm run build` | Uygulamayı derler |
 | `npm run dist:win` | Windows kurulum dosyası üretir (Linux'ta `wine` gerekir) |

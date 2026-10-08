@@ -25,6 +25,7 @@ export const supabase = createClient<Database>(url ?? 'http://localhost', publis
 })
 
 export const SUPABASE_URL = url ?? ''
+export const SUPABASE_KEY = publishableKey ?? ''
 
 export function publicImageUrl(path: string | null | undefined): string | null {
   if (!path) return null

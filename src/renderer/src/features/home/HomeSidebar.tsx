@@ -1,9 +1,10 @@
-import { Users } from 'lucide-react'
+import { Phone, Users } from 'lucide-react'
 import { Avatar } from '@/components/Avatar'
 import { Badge } from '@/components/ui'
 import { useDms, useFriendships, useUnread } from '@/data/queries'
 import { useSession } from '@/stores/session'
 import { useUi } from '@/stores/ui'
+import { useCall } from '@/voice/call'
 
 export function HomeSidebar() {
   const view = useUi((s) => s.view)
@@ -12,6 +13,7 @@ export function HomeSidebar() {
   const { data: dms = [] } = useDms()
   const { data: unread } = useUnread()
   const { data: friendships = [] } = useFriendships()
+  const call = useCall((s) => s.call)
   const pending = friendships.filter((f) => f.status === 'pending' && f.addressee_id === me).length
 
   return (
@@ -40,15 +42,17 @@ export function HomeSidebar() {
               key={dm.channel_id}
               type="button"
               onClick={() => setView({ kind: 'dm', channelId: dm.channel_id })}
-              className={`flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors ${
-                active ? 'bg-selected text-fg' : count ? 'text-fg hover:bg-hover' : 'text-muted hover:bg-hover hover:text-fg'
+              className={`relative flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors ${
+                active ? 'bg-selected text-fg' : count ? 'bg-accent-soft text-fg hover:bg-selected' : 'text-muted hover:bg-hover hover:text-fg'
               }`}
             >
+              {count > 0 && !active && <span className="anim-attention absolute top-1.5 bottom-1.5 -left-2 w-1 rounded-r-full bg-accent" />}
               <Avatar name={dm.display_name} path={dm.avatar_path} userId={dm.user_id} size={32} showStatus />
               <span className="min-w-0 flex-1">
                 <span className={`block truncate text-sm ${count ? 'font-bold' : 'font-medium'}`}>{dm.display_name}</span>
                 {dm.custom_status && <span className="block truncate text-xs text-faint">{dm.custom_status}</span>}
               </span>
+              {call?.channelId === dm.channel_id && <Phone className="size-4 shrink-0 text-online" aria-label="Arama sürüyor" />}
               <Badge count={count} />
             </button>
           )

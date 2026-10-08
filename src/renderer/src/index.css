@@ -191,9 +191,91 @@ textarea:focus-visible {
 .speaking-glow {
   animation: tc-speaking 1.2s ease-in-out infinite;
 }
+/* Başlık çubuğu: pencere buradan sürüklenir; sağdaki 140 piksel Windows düğmelerine ayrılır. */
+.titlebar {
+  -webkit-app-region: drag;
+  padding-right: 140px;
+}
+.titlebar button,
+.titlebar a {
+  -webkit-app-region: no-drag;
+}
+
+/* Yeni gelen mesaj hafifçe aşağıdan belirir. */
+@keyframes tc-msg-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+/* Bildirim kartı sağdan kayarak gelir. */
+@keyframes tc-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+}
+/* Okunmamış rozeti ve tepkiler belirirken hafifçe zıplar. */
+@keyframes tc-bump {
+  0% {
+    transform: scale(0.6);
+  }
+  60% {
+    transform: scale(1.18);
+  }
+}
+/* Gelen arama: avatarın çevresinde dışa doğru yayılan halka. */
+@keyframes tc-ring {
+  from {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-online) 55%, transparent);
+  }
+  to {
+    box-shadow: 0 0 0 18px transparent;
+  }
+}
+/* Yüklenirken görünen gri yer tutucuların üzerinden geçen parıltı. */
+@keyframes tc-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+/* Okunmamışı olan sohbetin solundaki çubuk dikkat çekmek için hafifçe yanıp söner. */
+@keyframes tc-attention {
+  50% {
+    opacity: 0.45;
+  }
+}
+.anim-msg {
+  animation: tc-msg-in 180ms ease-out;
+}
+.anim-slide {
+  animation: tc-slide-in 220ms cubic-bezier(0.2, 0.9, 0.3, 1.1);
+}
+.anim-bump {
+  animation: tc-bump 260ms cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+.anim-ring {
+  animation: tc-ring 1.3s ease-out infinite;
+}
+.anim-attention {
+  animation: tc-attention 1.6s ease-in-out infinite;
+}
+.skeleton {
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--tc-input) 25%, var(--tc-line) 50%, var(--tc-input) 75%);
+  background-size: 200% 100%;
+  animation: tc-shimmer 1.4s linear infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .anim-fade,
   .anim-pop,
+  .anim-msg,
+  .anim-slide,
+  .anim-bump,
+  .anim-ring,
+  .anim-attention,
+  .skeleton,
   .speaking-glow {
     animation: none;
   }

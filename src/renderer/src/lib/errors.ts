@@ -20,6 +20,7 @@ const MESSAGES: Record<string, string> = {
   owner_cannot_leave: 'Sunucunun sahibi sunucudan ayrılamaz; önce sunucuyu silmelisin.',
   last_admin: 'Son yöneticinin yetkisi alınamaz.',
   invalid_attachments: 'Ek dosya geçersiz.',
+  busy: 'Bu sohbette zaten çalan bir arama var.',
   server_error: 'Sunucuda bir sorun oluştu. Biraz sonra tekrar dene.',
   failed: 'İşlem başarısız oldu.',
 }

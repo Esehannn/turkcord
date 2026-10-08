@@ -19,6 +19,13 @@ Arayüz metinleri, kod yorumları ve commit mesajları Türkçe.
   oluşan sürüm numarasıyla (`list_migrations`) aynı adlı dosya repoya eklenmeli; yoksa entegrasyon aynı SQL'i tekrar çalıştırır.
 - Her şema değişikliğinde `supabase/tests/rls_test.sql`'e test ekle ve `src/renderer/src/lib/database.types.ts`'i güncelle.
 
+## Sesler ve dosyalar
+
+- Uygulamada ses dosyası yok: bildirim sesleri, arama melodisi ve ses efektleri `src/renderer/src/lib/sounds.ts`'te sentezlenir.
+- Alias (`@/`) kullanmayan saf yardımcılar (`lib/files.ts`, `lib/format.ts`, `lib/markdown.ts`) `node --test` ile doğrudan test edilir;
+  bu dosyalara alias'lı içe aktarım ekleme.
+- Bireysel aramalar ses kanallarıyla aynı motoru kullanır (`voice/engine.ts`, `serverId` null); çaldırma `calls` tablosundan geçer (`voice/call.ts`).
+
 ## Ortak kurallar
 
 `src/shared/password.ts` ve `supabase/functions/_shared/password.ts` aynı kalmalı (testi var).

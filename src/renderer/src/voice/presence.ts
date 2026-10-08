@@ -4,17 +4,18 @@ import { useVoice, type VoiceParticipant } from './store'
 
 // Ses kanallarında kimin olduğu "chan:{kanal}" konusundaki presence ile izlenir.
 // Aynı kanalı birden çok yer izleyebilir (kenar çubuğu, bağlı olduğum kanal); bu yüzden sayaçlı tutulur.
+// Bireysel aramalarda konu "ara:{kanal}"dır: özel mesajda "chan:{kanal}" zaten "yazıyor…" için açıktır.
 
 type Entry = { channel: RealtimeChannel; refs: number; ready: Promise<void> }
 const entries = new Map<string, Entry>()
 
 type Meta = { muted?: boolean; deafened?: boolean }
 
-function ensure(channelId: string, userId: string): Entry {
+function ensure(channelId: string, userId: string, dm: boolean): Entry {
   const existing = entries.get(channelId)
   if (existing) return existing
 
-  const channel = supabase.channel(`chan:${channelId}`, { config: { private: true, presence: { key: userId } } })
+  const channel = supabase.channel(`${dm ? 'ara' : 'chan'}:${channelId}`, { config: { private: true, presence: { key: userId } } })
   let resolveReady: () => void = () => {}
   const ready = new Promise<void>((resolve) => (resolveReady = resolve))
 
@@ -38,8 +39,8 @@ function ensure(channelId: string, userId: string): Entry {
 }
 
 // İzlemeyi başlatır; dönen fonksiyon izlemeyi bırakır.
-export function watchVoiceRoom(channelId: string, userId: string): () => void {
-  const entry = ensure(channelId, userId)
+export function watchVoiceRoom(channelId: string, userId: string, dm = false): () => void {
+  const entry = ensure(channelId, userId, dm)
   entry.refs++
   return () => {
     entry.refs--
@@ -54,8 +55,8 @@ export function watchVoiceRoom(channelId: string, userId: string): () => void {
   }
 }
 
-export async function trackVoice(channelId: string, userId: string, meta: Meta): Promise<void> {
-  const entry = ensure(channelId, userId)
+export async function trackVoice(channelId: string, userId: string, meta: Meta, dm = false): Promise<void> {
+  const entry = ensure(channelId, userId, dm)
   await entry.ready
   await entry.channel.track(meta)
 }

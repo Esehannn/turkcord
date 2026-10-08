@@ -1,41 +1,62 @@
+import { create } from 'zustand'
 import { useUi } from '@/stores/ui'
+import { playSound, type NotifySound } from './sounds'
 
-// Masaüstü bildirimi, kısa bir "dıt" sesi, görev çubuğunda yanıp sönme ve okunmamış rozeti.
+// Bildirimler: ses, uygulama içi bildirim kartı (pencere öndeyken), masaüstü bildirimi (pencere
+// arkadayken), görev çubuğunda yanıp sönme ve okunmamış rozeti.
 
-let audio: AudioContext | null = null
-
-export function playPing(): void {
-  if (!useUi.getState().sounds) return
-  try {
-    audio ??= new AudioContext()
-    const now = audio.currentTime
-    for (const [i, freq] of [880, 1320].entries()) {
-      const osc = audio.createOscillator()
-      const gain = audio.createGain()
-      osc.type = 'sine'
-      osc.frequency.value = freq
-      const start = now + i * 0.09
-      gain.gain.setValueAtTime(0.0001, start)
-      gain.gain.exponentialRampToValueAtTime(0.12, start + 0.01)
-      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.18)
-      osc.connect(gain).connect(audio.destination)
-      osc.start(start)
-      osc.stop(start + 0.2)
-    }
-  } catch {
-    // Ses çalınamazsa sessizce geç.
-  }
+export type Banner = {
+  id: number
+  title: string
+  body: string
+  // Kartta gösterilecek kişi (avatar için).
+  avatar?: { name: string; path?: string | null }
+  onClick?: () => void
 }
 
-export function showNotification(title: string, body: string, onClick?: () => void): void {
-  const { notifications, status } = useUi.getState()
+type BannerState = { banners: Banner[]; dismiss: (id: number) => void }
+
+export const useBanners = create<BannerState>((set, get) => ({
+  banners: [],
+  dismiss: (id) => set({ banners: get().banners.filter((b) => b.id !== id) }),
+}))
+
+const BANNER_MS = 6000
+let nextBanner = 1
+
+function pushBanner(banner: Omit<Banner, 'id'>): void {
+  const id = nextBanner++
+  useBanners.setState((s) => ({ banners: [...s.banners.slice(-2), { ...banner, id }] }))
+  setTimeout(() => useBanners.getState().dismiss(id), BANNER_MS)
+}
+
+export type NotifyOptions = {
+  title: string
+  body: string
+  // Çalınacak ses; null verilirse ses çalınmaz (ör. arama melodisi ayrıca çalıyorsa).
+  sound?: NotifySound | null
+  // Pencere öndeyken uygulama içi kart gösterilsin mi? (varsayılan: evet)
+  banner?: boolean
+  avatar?: Banner['avatar']
+  onClick?: () => void
+}
+
+export function showNotification({ title, body, sound = 'message', banner = true, avatar, onClick }: NotifyOptions): void {
+  const { notifications, banners, status } = useUi.getState()
   window.turkcord?.flashWindow()
   if (status === 'dnd') return
-  playPing()
+  if (sound) playSound(sound)
+
+  const text = body.slice(0, 160)
+  if (document.hasFocus()) {
+    if (banner && banners) pushBanner({ title, body: text, avatar, onClick })
+    return
+  }
   if (!notifications || !('Notification' in window) || Notification.permission === 'denied') return
   try {
-    const n = new Notification(title, { body: body.slice(0, 160), silent: true })
+    const n = new Notification(title, { body: text, silent: true })
     n.onclick = () => {
+      window.turkcord?.showWindow?.()
       window.focus()
       onClick?.()
     }
@@ -47,8 +68,10 @@ export function showNotification(title: string, body: string, onClick?: () => vo
 let lastBadge = -1
 
 export function setUnreadBadge(count: number): void {
-  if (!window.turkcord || count === lastBadge) return
+  if (count === lastBadge) return
   lastBadge = count
+  document.title = count > 0 ? `(${count > 99 ? '99+' : count}) Turkcord` : 'Turkcord'
+  if (!window.turkcord) return
   if (count <= 0) {
     window.turkcord.setBadge(0, null)
     return
