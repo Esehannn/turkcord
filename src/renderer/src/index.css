@@ -245,6 +245,17 @@ textarea:focus-visible {
     opacity: 0.45;
   }
 }
+/* Yükleme ekranı: logodaki yıldız kendi merkezinde, her turda hızlanıp yavaşlayarak döner. */
+@keyframes tc-star-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.logo-star-spin {
+  transform-box: view-box;
+  transform-origin: 45.5px 31px;
+  animation: tc-star-spin 1.5s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+}
 .anim-msg {
   animation: tc-msg-in 180ms ease-out;
 }

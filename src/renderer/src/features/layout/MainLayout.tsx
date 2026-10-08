@@ -67,7 +67,7 @@ export function MainLayout({ userId }: { userId: string }) {
     }
   }, [servers.data, view, setView])
 
-  if (profiles.isLoading || servers.isLoading) return <Splash />
+  if (profiles.isLoading || servers.isLoading) return <Splash text="Sohbetler yükleniyor…" />
 
   return (
     <div className="flex h-full">
