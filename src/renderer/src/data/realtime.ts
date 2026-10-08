@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { CallRow, ChannelRow, FriendshipRow, MessageRow, ProfileRow, ReactionRow, ServerMemberRow } from '@/lib/database.types'
+import { coalesce } from '@/lib/coalesce'
 import { fileKind } from '@/lib/files'
 import { mentionsUser } from '@/lib/markdown'
 import { showNotification } from '@/lib/notify'
@@ -189,12 +190,15 @@ export function useRealtimeSync(userId: string): void {
 // Çevrimiçi durumu: herkes "online" kanalına kendi durumunu bildirir. Görünmez seçilirse bildirilmez.
 export function usePresenceSync(userId: string): void {
   const status = useUi((s) => s.status)
-  const channelRef = useRef<RealtimeChannel | null>(null)
   const idleRef = useRef(false)
+  // Durum bildirimi seyreltilir: Supabase bir kanalda 30 saniyede en fazla 5 presence çağrısına izin verir;
+  // aşılırsa kanal kapanır ve herkes seni çevrimdışı görür.
+  const syncRef = useRef<ReturnType<typeof coalesce> | null>(null)
 
   useEffect(() => {
     const channel = supabase.channel('online', { config: { private: true, presence: { key: userId } } })
-    channelRef.current = channel
+    const sync = coalesce(track, 8000)
+    syncRef.current = sync
 
     channel
       .on('presence', { event: 'sync' }, () => {
@@ -207,7 +211,7 @@ export function usePresenceSync(userId: string): void {
         usePresence.setState({ online })
       })
       .subscribe((s) => {
-        if (s === 'SUBSCRIBED') void track()
+        if (s === 'SUBSCRIBED') sync.flush()
       })
 
     async function track() {
@@ -225,13 +229,14 @@ export function usePresenceSync(userId: string): void {
       const idle = seconds >= IDLE_AFTER_SECONDS
       if (idle !== idleRef.current) {
         idleRef.current = idle
-        void track()
+        sync.trigger()
       }
     }, 30_000)
 
     return () => {
       clearInterval(interval)
-      channelRef.current = null
+      sync.cancel()
+      syncRef.current = null
       void supabase.removeChannel(channel)
     }
   }, [userId])
@@ -243,10 +248,7 @@ export function usePresenceSync(userId: string): void {
       firstRun.current = false
       return
     }
-    const channel = channelRef.current
-    if (!channel) return
-    if (status === 'invisible') void channel.untrack()
-    else void channel.track({ status: status === 'online' && idleRef.current ? 'idle' : status })
+    syncRef.current?.trigger()
   }, [status])
 }
 

@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { coalesce } from '@/lib/coalesce'
 import { blocksTyping } from '@/lib/keys'
 import { setDeafened, setMuted, setPushToTalk } from '@/voice/engine'
 import { useVoice } from '@/voice/store'
@@ -79,15 +80,17 @@ export function startDesktopBridge(): () => void {
 
   // Tepsi menüsü ve simge ipucu için ses durumunu ana sürece bildir.
   if (bridge?.reportVoiceStatus) {
-    const report = () => {
+    // Tepsi menüsü her bildirimde yeniden kurulur; hızlı aç-kapa yapılınca sadece son durum bildirilir.
+    const report = coalesce(() => {
       const { status, muted, deafened } = useVoice.getState()
       bridge.reportVoiceStatus({ inVoice: status !== 'idle', muted, deafened })
-    }
-    report()
+    }, 250)
+    report.trigger()
     cleanups.push(
       useVoice.subscribe((s, prev) => {
-        if (s.status !== prev.status || s.muted !== prev.muted || s.deafened !== prev.deafened) report()
+        if (s.status !== prev.status || s.muted !== prev.muted || s.deafened !== prev.deafened) report.trigger()
       }),
+      report.cancel,
     )
   }
 
