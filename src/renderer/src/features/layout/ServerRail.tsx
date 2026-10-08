@@ -99,7 +99,10 @@ function RailItem({
         {children}
       </button>
       {badge > 0 && (
-        <span className="pointer-events-none absolute right-2.5 bottom-0 grid h-5 min-w-5 place-items-center rounded-full bg-white px-1 text-[11px] font-bold text-accent ring-4 ring-rail dark:bg-accent dark:text-white">
+        <span
+          key={badge}
+          className="anim-bump pointer-events-none absolute right-2.5 bottom-0 grid h-5 min-w-5 place-items-center rounded-full bg-white px-1 text-[11px] font-bold text-accent ring-4 ring-rail dark:bg-accent dark:text-white"
+        >
           {badge > 99 ? '99+' : badge}
         </span>
       )}

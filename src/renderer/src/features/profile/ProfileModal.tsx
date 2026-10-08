@@ -1,4 +1,4 @@
-import { Ban, MessageCircle, UserCheck, UserPlus } from 'lucide-react'
+import { Ban, MessageCircle, Phone, UserCheck, UserPlus } from 'lucide-react'
 import { Avatar, STATUS_LABEL } from '@/components/Avatar'
 import { confirmDialog, Modal } from '@/components/Modal'
 import { Button } from '@/components/ui'
@@ -8,6 +8,7 @@ import { formatDay } from '@/lib/format'
 import { useStatus } from '@/stores/presence'
 import { useSession } from '@/stores/session'
 import { useUi } from '@/stores/ui'
+import { startCall } from '@/voice/call'
 
 export function ProfileModal({ userId, onClose }: { userId: string; onClose: () => void }) {
   const me = useSession((s) => s.session?.user.id)
@@ -52,6 +53,18 @@ export function ProfileModal({ userId, onClose }: { userId: string; onClose: () 
                 }}
               >
                 <MessageCircle className="size-4" /> Mesaj
+              </Button>
+            )}
+            {!blocked && (
+              <Button
+                variant="secondary"
+                onClick={async () => {
+                  onClose()
+                  const channelId = await actions.openDm(userId).catch(() => null)
+                  if (channelId) void startCall(channelId, userId)
+                }}
+              >
+                <Phone className="size-4" /> Ara
               </Button>
             )}
             {!blocked && !friendship && (

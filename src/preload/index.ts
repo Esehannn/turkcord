@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { TurkcordApi } from './api'
+import type { TurkcordApi, UpdateStage } from './api'
 
 // Arayüze açılan küçük ve sınırlı köprü. Node.js veya Electron'un kendisi arayüze açılmaz.
 const api: TurkcordApi = {
@@ -22,6 +22,14 @@ const api: TurkcordApi = {
     return () => ipcRenderer.removeListener('guncelleme:hazir', listener)
   },
   installUpdate: () => ipcRenderer.invoke('guncelleme:kur'),
+  updateStage: () => ipcRenderer.invoke('guncelleme:asama-oku'),
+  onUpdateStage: (callback) => {
+    const listener = (_event: unknown, stage: unknown) => {
+      if (stage && typeof stage === 'object' && typeof (stage as { phase?: unknown }).phase === 'string') callback(stage as UpdateStage)
+    }
+    ipcRenderer.on('guncelleme:asama', listener)
+    return () => ipcRenderer.removeListener('guncelleme:asama', listener)
+  },
   desktopSettings: () => ipcRenderer.invoke('masaustu:ayarlar'),
   setDesktopSettings: (patch) => ipcRenderer.invoke('masaustu:ayarla', patch),
   setShortcuts: (shortcuts) => ipcRenderer.invoke('kisayol:ayarla', shortcuts),
@@ -33,6 +41,9 @@ const api: TurkcordApi = {
     return () => ipcRenderer.removeListener('kisayol:basildi', listener)
   },
   reportVoiceStatus: (status) => ipcRenderer.send('ses:durum', status),
+  setTheme: (theme) => ipcRenderer.send('pencere:tema', theme),
+  requestAttention: () => ipcRenderer.send('pencere:dikkat'),
+  showWindow: () => ipcRenderer.send('pencere:goster'),
 }
 
 contextBridge.exposeInMainWorld('turkcord', api)

@@ -37,6 +37,17 @@ Bir güvenlik açığı bulursan lütfen herkese açık bir issue açma. GitHub'
 - Bağlantı bilgisi sadece o ses kanalının sunucusundaki üyeler arasında, korumalı Realtime kanalında paylaşılır.
   P2P'nin doğası gereği aynı ses kanalındaki kişiler birbirinin IP adresini görebilir.
 - Cloudflare TURN bilgisi sunucu tarafında kısa ömürlü olarak üretilir; API anahtarı Supabase'in gizli ayarlarında durur.
+- Bireysel aramalar sadece özel mesajın iki tarafı arasında başlatılabilir; engelleme varsa arama yapılamaz. Arama
+  kayıtlarını (`calls`) sadece taraflar görür ve durumları sadece sunucudaki fonksiyonlar değiştirir (dakikada en fazla 6 arama).
+- Ses efektlerinde ses verisi gönderilmez, sadece "şu efekti çal" sinyali gider; alıcı sadece bilinen efekt adlarını,
+  o an kanalda olan kişilerden ve sınırlı sıklıkta kabul eder.
+
+**Dosya ekleri**
+
+- Ekler gizli bir kovada durur; sadece o kanala erişimi olanlar kısa ömürlü imzalı bağlantıyla okuyabilir.
+- Dosyalar uygulamanın içinde çalıştırılmaz ve açılmaz: görsel, ses ve video dışındakiler sadece indirilebilir (indirme
+  varsayılan tarayıcıda yapılır). SVG görsel olarak gösterilmez; HTML/betik türleri düz ikili veri olarak saklanır.
+- Dosya adı, türü ve yolu veritabanında doğrulanır; bir kullanıcı başkasının klasöründeki dosyayı mesajına ekleyemez.
 
 **Masaüstü uygulaması**
 

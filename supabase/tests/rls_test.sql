@@ -472,6 +472,117 @@ reset role;
 select tests.login(:'ali');
 set role authenticated;
 select tests.ok((select count(*) = 1 from storage.objects where bucket_id = 'ekler'), 'kanal üyesi ekleri görebilir');
+select tests.ok((select count(*) >= 1 from public.admin_storage_usage()), 'yönetici depolama kullanımını görebilir');
+
+-- ---------------------------------------------------------------------------
+-- 9. Dosya ekleri ve bireysel aramalar
+-- ---------------------------------------------------------------------------
+
+reset role;
+select tests.ok(
+  (select file_size_limit = 25 * 1024 * 1024 and allowed_mime_types is null from storage.buckets where id = 'ekler'),
+  'ekler kovası her tür dosyayı 25 MB sınırıyla kabul ediyor');
+
+select tests.login(:'veli');
+set role authenticated;
+insert into public.messages (channel_id, content, attachments)
+values (:'genel_id', '', jsonb_build_array(jsonb_build_object(
+  'path', :'genel_id' || '/' || :'veli' || '/rapor.pdf', 'name', 'rapor.pdf', 'type', 'application/pdf', 'size', 1234)));
+select tests.fails(
+  format('insert into public.messages (channel_id, content, attachments) values (%L, %L, %L)', :'genel_id', '',
+         jsonb_build_array(jsonb_build_object('path', :'genel_id' || '/' || :'veli' || '/x.bin', 'name', repeat('a', 201)))),
+  'çok uzun dosya adı reddedilir', 'turkcord:invalid_attachments');
+select tests.fails(
+  format('insert into public.messages (channel_id, content, kind) values (%L, %L, %L)', :'dm_id', 'missed', 'call'),
+  'kullanıcı sahte arama kaydı ekleyemez', 'permission denied');
+select tests.fails($$select * from public.admin_storage_usage()$$, 'yönetici olmayan depolama kullanımını göremez', 'turkcord:forbidden');
+select tests.fails($$select * from public.stale_attachments(30, 0)$$, 'temizlik listesi sadece sunucu tarafında', 'permission denied');
+
+select tests.fails(format('select public.start_call(%L)', :'genel_id'), 'sunucu kanalında arama başlatılamaz', 'turkcord:forbidden');
+select public.start_call(:'dm_id') as call_id \gset
+select tests.fails(format('select public.start_call(%L)', :'dm_id'), 'çalan arama varken yenisi başlatılamaz', 'turkcord:busy');
+select tests.fails(format('select public.answer_call(%L, true)', :'call_id'), 'arayan kendi aramasını cevaplayamaz', 'turkcord:not_found');
+select tests.fails(
+  format('insert into public.calls (channel_id, caller_id, callee_id) values (%L, %L, %L)', :'dm_id', :'veli', :'ayse'),
+  'arama tablosuna doğrudan yazılamaz', 'permission denied');
+select tests.fails(
+  format('update public.calls set status = %L where id = %L', 'accepted', :'call_id'),
+  'arama durumu doğrudan değiştirilemez', 'permission denied');
+
+reset role;
+select tests.login(:'mehmet');
+set role authenticated;
+select tests.ok((select count(*) = 0 from public.calls), 'mehmet başkalarının aramasını göremez');
+select tests.fails(format('select public.start_call(%L)', :'dm_id'), 'mehmet başkalarının DMinde arama başlatamaz', 'turkcord:forbidden');
+select tests.fails(format('select public.answer_call(%L, true)', :'call_id'), 'mehmet başkasının aramasını cevaplayamaz', 'turkcord:not_found');
+select public.end_call(:'call_id');
+
+reset role;
+select tests.login(:'ayse');
+set role authenticated;
+select tests.ok((select status = 'ringing' from public.calls where id = :'call_id'), 'başkası aramayı kapatamaz; ayşe çalan aramayı görüyor');
+select public.answer_call(:'call_id', true);
+select tests.ok((select status = 'accepted' and answered_at is not null from public.calls where id = :'call_id'), 'ayşe aramayı açtı');
+
+reset role;
+select tests.login(:'veli');
+set role authenticated;
+select public.end_call(:'call_id');
+select tests.ok((select status = 'ended' and ended_at is not null from public.calls where id = :'call_id'), 'veli görüşmeyi bitirdi');
+select tests.ok(
+  (select count(*) = 1 from public.messages where channel_id = :'dm_id' and kind = 'call' and content like 'ended:%' and author_id = :'veli'),
+  'biten görüşme sohbete süresiyle kaydedildi');
+select tests.fails(
+  format('update public.messages set content = %L where channel_id = %L and kind = %L', 'ended:99999', :'dm_id', 'call'),
+  'arama kaydı düzenlenemez', 'turkcord:forbidden');
+select public.start_call(:'dm_id') as call2_id \gset
+select public.end_call(:'call2_id');
+select tests.ok((select status = 'missed' from public.calls where id = :'call2_id'), 'arayan vazgeçince arama cevapsız sayılır');
+
+reset role;
+select tests.login(:'ayse');
+set role authenticated;
+select tests.ok(
+  (select unread >= 1 from public.unread_counts() where channel_id = :'dm_id'),
+  'cevapsız arama okunmamış olarak görünüyor');
+select public.start_call(:'dm_id') as call3_id \gset
+
+reset role;
+select tests.login(:'veli');
+set role authenticated;
+select public.answer_call(:'call3_id', false);
+select tests.ok((select status = 'declined' from public.calls where id = :'call3_id'), 'aranan aramayı reddedebilir');
+select tests.ok(
+  (select count(*) = 1 from public.messages where channel_id = :'dm_id' and kind = 'call' and content = 'declined' and author_id = :'ayse'),
+  'reddedilen arama sohbete kaydedildi');
+
+-- Arama odası (presence)
+reset role;
+insert into realtime.messages (topic, extension, payload) values ('ara:' || :'dm_id', 'presence', '{}');
+select tests.login(:'veli');
+select tests.topic('ara:' || :'dm_id');
+set role authenticated;
+select tests.ok((select count(*) = 1 from realtime.messages where topic = realtime.topic()), 'DM üyesi arama odasını görebilir');
+insert into realtime.messages (topic, extension) values ('ara:' || :'dm_id', 'presence');
+
+reset role;
+select tests.login(:'mehmet');
+set role authenticated;
+select tests.ok((select count(*) = 0 from realtime.messages where topic = realtime.topic()), 'mehmet arama odasını göremez');
+select tests.fails(
+  format('insert into realtime.messages (topic, extension) values (%L, %L)', 'ara:' || :'dm_id', 'presence'),
+  'mehmet arama odasına katılamaz', 'row-level security');
+
+-- Engelleme varken arama yapılamaz
+reset role;
+select tests.login(:'ayse');
+set role authenticated;
+select public.block_user(:'veli');
+
+reset role;
+select tests.login(:'veli');
+set role authenticated;
+select tests.fails(format('select public.start_call(%L)', :'dm_id'), 'engellenen kişi arayamaz', 'turkcord:forbidden');
 
 reset role;
 \echo 'Tüm veritabanı testleri geçti.'

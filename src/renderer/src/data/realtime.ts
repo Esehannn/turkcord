@@ -2,11 +2,13 @@ import { useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
-import type { ChannelRow, FriendshipRow, MessageRow, ProfileRow, ReactionRow, ServerMemberRow } from '@/lib/database.types'
+import type { CallRow, ChannelRow, FriendshipRow, MessageRow, ProfileRow, ReactionRow, ServerMemberRow } from '@/lib/database.types'
+import { fileKind } from '@/lib/files'
 import { mentionsUser } from '@/lib/markdown'
 import { showNotification } from '@/lib/notify'
 import { usePresence, type OnlineStatus } from '@/stores/presence'
 import { useUi } from '@/stores/ui'
+import { onCallRow } from '@/voice/call'
 import { addMessage, addReaction, bumpUnread, removeMessage, removeReaction, updateMessage } from './cache'
 import { keys } from './queries'
 
@@ -32,6 +34,14 @@ async function channelInfo(qc: ReturnType<typeof useQueryClient>, channelId: str
   return data
 }
 
+function attachmentText(row: MessageRow): string {
+  const first = row.attachments[0]
+  if (!first) return ''
+  const kind = fileKind(first)
+  if (kind === 'image') return '🖼️ Görsel gönderdi'
+  return `📎 ${first.name ?? 'Dosya'} gönderdi`
+}
+
 // Veritabanı değişikliklerini dinler. Her kullanıcı sadece görmeye yetkili olduğu satırları alır (RLS).
 export function useRealtimeSync(userId: string): void {
   const qc = useQueryClient()
@@ -41,29 +51,44 @@ export function useRealtimeSync(userId: string): void {
 
     const onMessage = async (row: MessageRow) => {
       addMessage(qc, row)
-      if (row.author_id === userId) return
       const channel = await channelInfo(qc, row.channel_id)
       if (channel?.kind === 'dm') void qc.invalidateQueries({ queryKey: keys.dms })
+      if (row.author_id === userId) return
+      // Arama kayıtlarından sadece cevapsız aramalar bildirilir.
+      const isCall = row.kind === 'call'
+      if (isCall && row.content !== 'missed') return
       if (isViewingChannel(row.channel_id)) return
 
       const profiles = qc.getQueryData<Map<string, ProfileRow>>(keys.profiles)
       const me = profiles?.get(userId)
-      const mentioned = !!me && mentionsUser(row.content, me.username)
+      const mentioned = !isCall && !!me && mentionsUser(row.content, me.username)
       bumpUnread(qc, row.channel_id, channel?.server_id ?? null, mentioned)
 
-      if (channel?.kind === 'dm' || mentioned) {
-        const author = row.author_id ? profiles?.get(row.author_id) : undefined
-        const title = channel?.kind === 'dm' ? (author?.display_name ?? 'Yeni mesaj') : `${author?.display_name ?? 'Biri'} seni etiketledi`
-        const body = row.content || '📎 Görsel gönderdi'
-        showNotification(title, body, () => {
-          useUi
-            .getState()
-            .setView(
-              channel?.kind === 'dm'
-                ? { kind: 'dm', channelId: row.channel_id }
-                : { kind: 'server', serverId: channel!.server_id!, channelId: row.channel_id },
-            )
-        })
+      const author = row.author_id ? profiles?.get(row.author_id) : undefined
+      const name = author?.display_name ?? 'Biri'
+      const avatar = { name, path: author?.avatar_path }
+      const body = row.content || attachmentText(row)
+      const onClick = () => {
+        if (!channel) return
+        useUi
+          .getState()
+          .setView(
+            channel.kind === 'dm' || !channel.server_id
+              ? { kind: 'dm', channelId: row.channel_id }
+              : { kind: 'server', serverId: channel.server_id, channelId: row.channel_id },
+          )
+      }
+
+      if (channel?.kind === 'dm') {
+        showNotification(
+          isCall
+            ? { title: 'Cevapsız arama', body: `${name} seni aradı.`, sound: 'message', avatar, onClick }
+            : { title: name, body, sound: 'message', avatar, onClick },
+        )
+      } else if (mentioned) {
+        showNotification({ title: `${name} seni etiketledi`, body, sound: 'mention', avatar, onClick })
+      } else if (useUi.getState().notifyAll) {
+        showNotification({ title: `${name} · #${channel?.name ?? 'kanal'}`, body, sound: 'channel', avatar, onClick })
       }
     }
 
@@ -89,9 +114,14 @@ export function useRealtimeSync(userId: string): void {
         void qc.invalidateQueries({ queryKey: keys.friendships })
         if (p.eventType === 'INSERT' && p.new.addressee_id === userId) {
           const from = qc.getQueryData<Map<string, ProfileRow>>(keys.profiles)?.get(p.new.requester_id)
-          showNotification('Arkadaşlık isteği', `${from?.display_name ?? 'Biri'} sana arkadaşlık isteği gönderdi.`, () =>
-            useUi.getState().setView({ kind: 'home', tab: 'pending' }),
-          )
+          const name = from?.display_name ?? 'Biri'
+          showNotification({
+            title: 'Arkadaşlık isteği',
+            body: `${name} sana arkadaşlık isteği gönderdi.`,
+            sound: 'friend',
+            avatar: { name, path: from?.avatar_path },
+            onClick: () => useUi.getState().setView({ kind: 'home', tab: 'pending' }),
+          })
         }
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'servers' }, () => {
@@ -124,6 +154,9 @@ export function useRealtimeSync(userId: string): void {
         if (p.eventType === 'DELETE' && view.kind === 'server' && view.channelId === row.id) {
           useUi.getState().setView({ ...view, channelId: null })
         }
+      })
+      .on<CallRow>('postgres_changes', { event: '*', schema: 'public', table: 'calls' }, (p) => {
+        if (p.eventType !== 'DELETE') onCallRow(p.new)
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'dm_members' }, () => {
         void qc.invalidateQueries({ queryKey: keys.dms })

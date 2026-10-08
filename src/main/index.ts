@@ -2,7 +2,7 @@ import { app, BrowserWindow, clipboard, Menu, nativeImage, session, shell } from
 import { join } from 'node:path'
 import { registerAuthStorage } from './authStorage'
 import { hideOnClose, setupDesktop, startedHidden } from './desktop'
-import { registerWindowIpc } from './windowIpc'
+import { registerWindowIpc, titleBarOverlay } from './windowIpc'
 import { setupUpdater } from './updater'
 import { isSafeExternalUrl, isTrustedUrl } from './security'
 
@@ -31,6 +31,8 @@ function createWindow(): BrowserWindow {
     backgroundColor: '#ffffff',
     autoHideMenuBar: true,
     icon: nativeImage.createFromPath(iconPath()),
+    // Windows'ta gri sistem çubuğu yerine uygulamanın kendi başlık çubuğu; küçült/kapat düğmeleri yine Windows'un.
+    ...(process.platform === 'win32' ? { titleBarStyle: 'hidden' as const, titleBarOverlay: titleBarOverlay('light') } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,

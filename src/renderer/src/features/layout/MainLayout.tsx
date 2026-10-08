@@ -1,18 +1,22 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useProfiles, useServers, useUnread } from '@/data/queries'
 import { usePresenceSync, useRealtimeSync } from '@/data/realtime'
 import { setUnreadBadge } from '@/lib/notify'
 import { useUi } from '@/stores/ui'
+import { NotificationCards } from '@/components/NotificationCards'
 import { Splash } from '@/components/Splash'
 import { ChatView } from '@/features/chat/ChatView'
 import { FriendsView } from '@/features/home/FriendsView'
 import { HomeSidebar } from '@/features/home/HomeSidebar'
 import { MemberList } from '@/features/servers/MemberList'
 import { ServerSidebar } from '@/features/servers/ServerSidebar'
+import { autoCleanupOldFiles } from '@/features/settings/AdminPanel'
 import { ModalHost } from './ModalHost'
 import { ServerRail } from './ServerRail'
 import { UserPanel } from './UserPanel'
+import { IncomingCall } from '@/features/voice/IncomingCall'
 import { VoicePanel } from '@/features/voice/VoicePanel'
+import { initCalls } from '@/voice/call'
 import { leaveVoice } from '@/voice/engine'
 import { startDesktopBridge } from '@/lib/desktop'
 import { EmptyState } from '@/components/ui'
@@ -30,7 +34,18 @@ export function MainLayout({ userId }: { userId: string }) {
 
   // Oturum kapanınca ses kanalından da çık.
   useEffect(() => () => void leaveVoice(false), [])
+
+  // Bireysel aramalar: gelen aramayı dinle, çalan varsa göster.
+  const profileMap = useRef(profiles.data)
+  profileMap.current = profiles.data
+  useEffect(() => initCalls(userId, (id) => profileMap.current?.get(id)?.display_name ?? 'Biri'), [userId])
   useEffect(() => startDesktopBridge(), [])
+
+  // Yöneticinin uygulaması açıkken eski ve büyük dosya ekleri günde bir kez temizlenir (1 GB'lık alan dolmasın).
+  const isAdmin = !!profiles.data?.get(userId)?.is_admin
+  useEffect(() => {
+    if (isAdmin) autoCleanupOldFiles()
+  }, [isAdmin])
 
   // Bildirim izni bir kez istenir (Windows'ta genelde otomatik verilir).
   useEffect(() => {
@@ -52,7 +67,7 @@ export function MainLayout({ userId }: { userId: string }) {
     }
   }, [servers.data, view, setView])
 
-  if (profiles.isLoading || servers.isLoading) return <Splash />
+  if (profiles.isLoading || servers.isLoading) return <Splash text="Sohbetler yükleniyor…" />
 
   return (
     <div className="flex h-full">
@@ -74,6 +89,8 @@ export function MainLayout({ userId }: { userId: string }) {
         {view.kind === 'server' && memberList && <MemberList serverId={view.serverId} />}
       </main>
       <ModalHost />
+      <IncomingCall />
+      <NotificationCards />
     </div>
   )
 }

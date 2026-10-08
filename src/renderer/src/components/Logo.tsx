@@ -9,9 +9,11 @@ type LogoProps = {
   variant?: 'tile' | 'mark'
   className?: string
   title?: string
+  // Yükleme ekranında yıldız kendi çevresinde döner.
+  spin?: boolean
 }
 
-export function Logo({ size = 40, variant = 'tile', className, title = 'Turkcord' }: LogoProps) {
+export function Logo({ size = 40, variant = 'tile', className, title = 'Turkcord', spin = false }: LogoProps) {
   const fg = variant === 'tile' ? '#ffffff' : 'currentColor'
   return (
     <svg width={size} height={size} viewBox="0 0 64 64" className={className} role="img" aria-label={title}>
@@ -23,7 +25,7 @@ export function Logo({ size = 40, variant = 'tile', className, title = 'Turkcord
       <g fill={fg}>
         <circle cx="27" cy="31" r="17" mask="url(#turkcord-hilal)" />
         <path d="M14.5 40.5 L9 53 L23 45.8 Z" />
-        <path d={STAR} />
+        <path d={STAR} className={spin ? 'logo-star-spin' : undefined} />
       </g>
     </svg>
   )

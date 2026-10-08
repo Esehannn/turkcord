@@ -101,10 +101,14 @@ export type Attachment = {
   type?: string
 }
 
+// text: normal mesaj. call: sistemin eklediği arama kaydı (içerik: missed | declined | ended:<saniye>).
+export type MessageKind = 'text' | 'call'
+
 export type MessageRow = {
   id: string
   channel_id: string
   author_id: string | null
+  kind: MessageKind
   content: string
   attachments: Attachment[]
   reply_to: string | null
@@ -118,6 +122,19 @@ export type ReactionRow = {
   user_id: string
   emoji: string
   created_at: string
+}
+
+export type CallStatus = 'ringing' | 'accepted' | 'declined' | 'missed' | 'ended'
+
+export type CallRow = {
+  id: string
+  channel_id: string
+  caller_id: string
+  callee_id: string
+  status: CallStatus
+  created_at: string
+  answered_at: string | null
+  ended_at: string | null
 }
 
 export type ChannelReadRow = {
@@ -185,6 +202,7 @@ export type Database = {
         ]
       >
       channel_reads: Table<ChannelReadRow, never, never>
+      calls: Table<CallRow, never, never>
     }
     Views: { [_ in never]: never }
     Functions: {
@@ -250,6 +268,10 @@ export type Database = {
         Returns: { server_id: string; name: string; icon_path: string | null; member_count: number; already_member: boolean }[]
       }
       join_server: { Args: { p_code: string }; Returns: string }
+      start_call: { Args: { p_channel: string }; Returns: string }
+      answer_call: { Args: { p_call: string; p_accept: boolean }; Returns: undefined }
+      end_call: { Args: { p_call: string }; Returns: undefined }
+      admin_storage_usage: { Args: Record<string, never>; Returns: { bucket: string; files: number; bytes: number }[] }
     }
     Enums: { [_ in never]: never }
     CompositeTypes: { [_ in never]: never }

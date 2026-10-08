@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent } from 'react'
-import { ImagePlus, Send, Smile, X } from 'lucide-react'
+import { File as FileIcon, Paperclip, Send, Smile, X } from 'lucide-react'
 import { IconButton, Spinner } from '@/components/ui'
 import { useActions } from '@/data/actions'
 import type { ChatMessage } from '@/data/queries'
 import type { Attachment } from '@/lib/database.types'
-import { IMAGE_TYPES, uploadAttachment } from '@/lib/images'
+import { COMPRESSIBLE_IMAGES, MAX_FILE_BYTES, formatBytes } from '@/lib/files'
+import { uploadAttachment } from '@/lib/images'
 import { filterMentions, insertMention, mentionQuery, type MentionCandidate } from '@/lib/mentions'
 import { Avatar } from '@/components/Avatar'
 import { toast } from '@/stores/toast'
@@ -13,7 +14,8 @@ import { EmojiPicker } from './EmojiPicker'
 const MAX_LENGTH = 4000
 const MAX_FILES = 4
 
-type Pending = { id: string; file: File; preview: string }
+// preview: görseller için küçük resim adresi; diğer dosyalarda yok.
+type Pending = { id: string; file: File; preview: string | null }
 
 type Props = {
   channelId: string
@@ -27,6 +29,9 @@ type Props = {
   onTyping: () => void
   // "@" yazınca önerilecek kişiler.
   mentionables: (MentionCandidate & { avatar_path: string | null })[]
+  // Sohbete sürüklenip bırakılan dosyalar (ChatView'dan gelir).
+  dropped: File[] | null
+  onDroppedTaken: () => void
 }
 
 // Taslaklar kanal değiştirince kaybolmasın.
@@ -43,10 +48,14 @@ export function Composer({
   onEditLast,
   onTyping,
   mentionables,
+  dropped,
+  onDroppedTaken,
 }: Props) {
   const [text, setText] = useState(() => drafts.get(channelId) ?? '')
   const [files, setFiles] = useState<Pending[]>([])
   const [sending, setSending] = useState(false)
+  // Yükleme ilerlemesi (0-1); dosya yokken null.
+  const [progress, setProgress] = useState<number | null>(null)
   const [picker, setPicker] = useState(false)
   const [mention, setMention] = useState<{ start: number; query: string } | null>(null)
   const [mentionIndex, setMentionIndex] = useState(0)
@@ -62,7 +71,15 @@ export function Composer({
     inputRef.current?.focus()
   }, [channelId, replyTo])
 
-  useEffect(() => () => files.forEach((f) => URL.revokeObjectURL(f.preview)), [files])
+  useEffect(() => () => files.forEach((f) => f.preview && URL.revokeObjectURL(f.preview)), [files])
+
+  useEffect(() => {
+    if (!dropped) return
+    addFiles(dropped)
+    onDroppedTaken()
+    inputRef.current?.focus()
+    // Sadece yeni dosya bırakılınca çalışır.
+  }, [dropped])
 
   // Yazı kutusu içeriğe göre büyür.
   useEffect(() => {
@@ -73,14 +90,20 @@ export function Composer({
   }, [text])
 
   function addFiles(list: FileList | File[]) {
-    const images = [...list].filter((f) => IMAGE_TYPES.includes(f.type))
-    if (images.length < [...list].length) toast.info('Şimdilik sadece görsel gönderilebiliyor.')
+    const all = [...list]
+    // Görseller yüklenirken küçültülür; diğer dosyalar olduğu gibi gider ve boyut sınırına tabidir.
+    const ok = all.filter((f) => COMPRESSIBLE_IMAGES.includes(f.type) || (f.size > 0 && f.size <= MAX_FILE_BYTES))
+    if (ok.length < all.length) toast.info(`Bir dosya en fazla ${formatBytes(MAX_FILE_BYTES)} olabilir.`)
     setFiles((current) => {
       const room = MAX_FILES - current.length
-      if (images.length > room) toast.info(`Bir mesajda en fazla ${MAX_FILES} görsel olabilir.`)
+      if (ok.length > room) toast.info(`Bir mesajda en fazla ${MAX_FILES} dosya olabilir.`)
       return [
         ...current,
-        ...images.slice(0, Math.max(0, room)).map((file) => ({ id: crypto.randomUUID(), file, preview: URL.createObjectURL(file) })),
+        ...ok.slice(0, Math.max(0, room)).map((file) => ({
+          id: crypto.randomUUID(),
+          file,
+          preview: COMPRESSIBLE_IMAGES.includes(file.type) ? URL.createObjectURL(file) : null,
+        })),
       ]
     })
   }
@@ -95,16 +118,22 @@ export function Composer({
     setSending(true)
     try {
       const attachments: Attachment[] = []
-      for (const f of files) attachments.push(await uploadAttachment(channelId, userId, f.file))
+      if (files.length) setProgress(0)
+      for (const [i, f] of files.entries()) {
+        attachments.push(await uploadAttachment(channelId, userId, f.file, (fraction) => setProgress((i + fraction) / files.length)))
+      }
       await actions.sendMessage(channelId, content, replyTo?.id ?? null, attachments)
       setText('')
       drafts.delete(channelId)
       setFiles([])
       onCancelReply()
     } catch (error) {
-      if (error instanceof Error && !('code' in error)) toast.error(error)
+      // Kendi yazdığımız hatalar (ör. "Dosya en fazla 25 MB olabilir") olduğu gibi gösterilir.
+      if (error instanceof Error && error.name === 'Error' && !('code' in error)) toast.info(error.message)
+      else if (error instanceof Error && !('code' in error)) toast.error(error)
     } finally {
       setSending(false)
+      setProgress(null)
       inputRef.current?.focus()
     }
   }
@@ -212,22 +241,34 @@ export function Composer({
           </div>
         </div>
       )}
-      <div
-        className={`bg-input ring-accent/50 focus-within:ring-1 ${replyTo ? 'rounded-b-lg' : 'rounded-lg'}`}
-        onDragOver={(e) => e.preventDefault()}
-        onDrop={(e) => {
-          e.preventDefault()
-          addFiles(e.dataTransfer.files)
-        }}
-      >
+      <div className={`overflow-hidden bg-input ring-accent/50 focus-within:ring-1 ${replyTo ? 'rounded-b-lg' : 'rounded-lg'}`}>
+        {progress !== null && (
+          <div className="h-1 bg-line" role="progressbar" aria-label="Dosya yükleniyor" aria-valuenow={Math.round(progress * 100)}>
+            <div className="h-full bg-accent transition-[width] duration-150" style={{ width: `${Math.round(progress * 100)}%` }} />
+          </div>
+        )}
         {files.length > 0 && (
           <div className="flex gap-3 overflow-x-auto border-b border-line p-3 scroll-thin">
             {files.map((f) => (
-              <div key={f.id} className="relative size-24 shrink-0 overflow-hidden rounded-md bg-sidebar">
-                <img src={f.preview} alt="" className="size-full object-cover" />
+              <div
+                key={f.id}
+                className={`relative h-24 shrink-0 overflow-hidden rounded-md bg-sidebar ${f.preview ? 'w-24' : 'flex w-44 flex-col justify-center gap-1 px-3'}`}
+              >
+                {f.preview ? (
+                  <img src={f.preview} alt="" className="size-full object-cover" />
+                ) : (
+                  <>
+                    <FileIcon className="size-6 text-accent" />
+                    <span className="truncate pr-5 text-xs font-semibold text-fg" title={f.file.name}>
+                      {f.file.name}
+                    </span>
+                    <span className="text-[11px] text-faint">{formatBytes(f.file.size)}</span>
+                  </>
+                )}
                 <button
                   type="button"
-                  aria-label="Görseli kaldır"
+                  aria-label="Dosyayı kaldır"
+                  disabled={sending}
                   onClick={() => setFiles((cur) => cur.filter((x) => x.id !== f.id))}
                   className="absolute top-1 right-1 grid size-6 place-items-center rounded-full bg-black/60 text-white hover:bg-accent"
                 >
@@ -238,13 +279,17 @@ export function Composer({
           </div>
         )}
         <div className="flex items-end gap-1 px-2">
-          <IconButton label="Görsel ekle" className="mb-1.5" onClick={() => fileRef.current?.click()} disabled={files.length >= MAX_FILES}>
-            <ImagePlus className="size-5" />
+          <IconButton
+            label={`Dosya ekle (en fazla ${formatBytes(MAX_FILE_BYTES)})`}
+            className="mb-1.5"
+            onClick={() => fileRef.current?.click()}
+            disabled={files.length >= MAX_FILES || sending}
+          >
+            <Paperclip className="size-5" />
           </IconButton>
           <input
             ref={fileRef}
             type="file"
-            accept={IMAGE_TYPES.join(',')}
             multiple
             hidden
             onChange={(e) => {

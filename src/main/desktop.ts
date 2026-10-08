@@ -14,6 +14,8 @@ const settingsFile = () => join(app.getPath('userData'), 'masaustu-ayarlari.json
 
 let settings: DesktopSettings = { closeToTray: true, openAtLogin: false }
 let tray: Tray | null = null
+let trayIcon: Electron.NativeImage | null = null
+let unread = 0
 let quitting = false
 let voice: VoiceStatus = { inVoice: false, muted: false, deafened: false }
 
@@ -58,7 +60,11 @@ function sendCommand(getWindow: () => BrowserWindow | null, command: 'mute' | 'd
 
 function refreshTray(getWindow: () => BrowserWindow | null): void {
   if (!tray) return
-  tray.setToolTip(voice.inVoice ? `Turkcord — sesli sohbette${voice.muted ? ' (mikrofon kapalı)' : ''}` : 'Turkcord')
+  const parts = [
+    voice.inVoice ? `sesli sohbette${voice.muted ? ' (mikrofon kapalı)' : ''}` : '',
+    unread > 0 ? `${unread} okunmamış` : '',
+  ].filter(Boolean)
+  tray.setToolTip(parts.length ? `Turkcord — ${parts.join(', ')}` : 'Turkcord')
   tray.setContextMenu(
     Menu.buildFromTemplate([
       { label: "Turkcord'u aç", click: () => showWindow(getWindow) },
@@ -106,10 +112,11 @@ function validAccelerator(value: unknown): value is string {
 export function setupDesktop(getWindow: () => BrowserWindow | null, iconPath: string): void {
   loadSettings()
 
-  const image = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 })
-  tray = new Tray(image)
+  trayIcon = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 })
+  tray = new Tray(trayIcon)
   tray.on('click', () => showWindow(getWindow))
   refreshTray(getWindow)
+  refreshTooltip = () => refreshTray(getWindow)
 
   app.on('before-quit', () => {
     quitting = true
@@ -140,6 +147,15 @@ export function setupDesktop(getWindow: () => BrowserWindow | null, iconPath: st
     voice = { inVoice: s.inVoice === true, muted: s.muted === true, deafened: s.deafened === true }
     refreshTray(getWindow)
   })
+}
+
+// Okunmamış mesaj varken tepsi simgesi kırmızı sayıya döner.
+let refreshTooltip: (() => void) | null = null
+export function setTrayUnread(count: number, badge: Electron.NativeImage | null): void {
+  unread = count
+  if (!tray || !trayIcon) return
+  tray.setImage(count > 0 && badge ? badge.resize({ width: 16, height: 16 }) : trayIcon)
+  refreshTooltip?.()
 }
 
 // Pencere kapatılınca uygulama kapanmasın, tepsiye insin (ayar açıksa).

@@ -1,4 +1,5 @@
-// Yönetici işlemleri: şifre sıfırlama, hesabı askıya alma, hesabı silme, kullanıcı durumlarını listeleme.
+// Yönetici işlemleri: şifre sıfırlama, hesabı askıya alma, hesabı silme, kullanıcı durumlarını listeleme,
+// eski dosya eklerini temizleme.
 // Ücretsiz Supabase arkadaşlara e-posta gönderemediği için "şifremi unuttum" yerine yönetici yeni şifre belirler.
 import { adminClient, corsHeaders, json, readJson } from '../_shared/http.ts'
 import { checkPassword } from '../_shared/password.ts'
@@ -43,6 +44,27 @@ Deno.serve(async (req) => {
         created_at: u.created_at,
       })),
     })
+  }
+
+  // 30 günden eski ve 5 MB'tan büyük mesaj eklerini siler. Ücretsiz planda toplam alan 1 GB olduğu için
+  // büyük dosyalar kalıcı tutulmaz; mesajın kendisi kalır, dosya "artık yok" olarak görünür.
+  if (action === 'cleanup_files') {
+    const { data, error } = await admin.rpc('stale_attachments', { p_days: 30, p_min_bytes: 5 * 1024 * 1024 })
+    if (error) {
+      console.error('stale_attachments', error.message)
+      return json(500, { error: 'server_error' })
+    }
+    const names = ((data ?? []) as { name: string }[]).map((row) => row.name)
+    let removed = 0
+    for (let i = 0; i < names.length; i += 100) {
+      const { data: gone, error: removeError } = await admin.storage.from('ekler').remove(names.slice(i, i + 100))
+      if (removeError) {
+        console.error('storage.remove', removeError.message)
+        break
+      }
+      removed += gone?.length ?? 0
+    }
+    return json(200, { removed, more: names.length >= 500 })
   }
 
   const userId = String(body.user_id ?? '')

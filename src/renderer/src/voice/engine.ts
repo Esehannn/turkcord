@@ -1,4 +1,5 @@
 import type { RealtimeChannel } from '@supabase/supabase-js'
+import { isEffectId, playEffect, type EffectId } from '@/lib/sounds'
 import { supabase } from '@/lib/supabase'
 import { toast } from '@/stores/toast'
 import { micErrorMessage, openMicrophone, type Microphone } from './mic'
@@ -14,6 +15,8 @@ import { micOpen, useVoice, volumeOf, type PeerLink } from './store'
 // Her iki kişi arasında tek bağlantı olur: kullanıcı kimliği küçük olan teklif (offer) gönderir.
 // Yeni gelen "hazir" yayınlar, kanaldakiler "merhaba" ile cevap verir; böylece iki taraf da
 // karşısının dinlemeye başladığını bilir ve teklif kaybolmaz.
+//
+// Bireysel aramalar da aynı motoru kullanır: kanal özel mesajın kanalıdır, sunucu yoktur (serverId null).
 
 export const MAX_PARTICIPANTS = 10
 const SPEAKING_THRESHOLD = 0.018
@@ -34,6 +37,8 @@ type Peer = {
 }
 
 let me = ''
+// Bağlı olunan oda bir özel mesaj araması mı?
+let dmRoom = false
 let mic: Microphone | null = null
 let stopLocalMeter: (() => void) | undefined
 let statsTimer: ReturnType<typeof setInterval> | undefined
@@ -256,7 +261,7 @@ useVoice.subscribe((state, prev) => {
 
 function publishState(): void {
   const { channelId, muted, deafened } = useVoice.getState()
-  if (channelId) void trackVoice(channelId, me, { muted, deafened })
+  if (channelId) void trackVoice(channelId, me, { muted, deafened }, dmRoom)
 }
 
 function applyMicrophone(): void {
@@ -319,7 +324,37 @@ async function refreshLinks(): Promise<void> {
 // Dışarıya açılan işlemler
 // ---------------------------------------------------------------------------
 
-export async function joinVoice(serverId: string, channelId: string, userId: string): Promise<void> {
+// Ses efektleri: sesin kendisi gitmez, sadece "şu efekti çal" sinyali gider; herkes kendi bilgisayarında çalar.
+const EFFECT_COOLDOWN_MS = 1500
+let lastSentEffect = 0
+const lastHeardEffect = new Map<string, number>()
+
+function showEffect(userId: string, id: EffectId): void {
+  useVoice.setState({ lastEffect: { userId, id, at: Date.now() } })
+  if (!useVoice.getState().deafened) playEffect(id)
+}
+
+function onEffect(payload: unknown): void {
+  const { from, id } = (payload ?? {}) as { from?: unknown; id?: unknown }
+  if (typeof from !== 'string' || from === me || !isEffectId(id) || !isInRoom(from)) return
+  const now = Date.now()
+  if (now - (lastHeardEffect.get(from) ?? 0) < EFFECT_COOLDOWN_MS - 300) return
+  lastHeardEffect.set(from, now)
+  showEffect(from, id)
+}
+
+// true: gönderildi; false: bekleme süresi dolmadı ya da kanalda değilim.
+export function sendEffect(id: EffectId): boolean {
+  if (!signal || useVoice.getState().status !== 'connected') return false
+  const now = Date.now()
+  if (now - lastSentEffect < EFFECT_COOLDOWN_MS) return false
+  lastSentEffect = now
+  void signal.send({ type: 'broadcast', event: 'efekt', payload: { from: me, id } })
+  showEffect(me, id)
+  return true
+}
+
+export async function joinVoice(serverId: string | null, channelId: string, userId: string): Promise<void> {
   const current = useVoice.getState()
   if (current.channelId === channelId && current.status !== 'idle') return
   if (current.channelId) await leaveVoice(false)
@@ -332,7 +367,8 @@ export async function joinVoice(serverId: string, channelId: string, userId: str
 
   const token = ++joinToken
   me = userId
-  setState({ status: 'connecting', channelId, serverId, speaking: {}, peers: {}, links: {} })
+  dmRoom = serverId === null
+  setState({ status: 'connecting', channelId, serverId, speaking: {}, peers: {}, links: {}, lastEffect: null })
   lastRoom = new Set()
 
   try {
@@ -355,12 +391,13 @@ export async function joinVoice(serverId: string, channelId: string, userId: str
   applyMicrophone()
   stopLocalMeter = localMeter()
   statsTimer = setInterval(() => void refreshLinks(), 2000)
-  unwatch = watchVoiceRoom(channelId, userId)
+  unwatch = watchVoiceRoom(channelId, userId, dmRoom)
 
   const channel = supabase.channel(`ses:${channelId}`, { config: { private: true, broadcast: { self: false } } })
   signal = channel
   channel
     .on('broadcast', { event: 'sinyal' }, ({ payload }) => void onSignal(payload as Signal))
+    .on('broadcast', { event: 'efekt' }, ({ payload }) => onEffect(payload))
     .subscribe((status) => {
       if (status === 'SUBSCRIBED' && token === joinToken) {
         send({ type: 'hazir', from: me })
@@ -390,7 +427,8 @@ export async function leaveVoice(playSound = true): Promise<void> {
   mic?.stop()
   mic = null
   lastRoom = new Set()
-  setState({ status: 'idle', channelId: null, serverId: null, speaking: {}, peers: {}, links: {} })
+  lastHeardEffect.clear()
+  setState({ status: 'idle', channelId: null, serverId: null, speaking: {}, peers: {}, links: {}, lastEffect: null })
   if (channelId && playSound) voiceSounds.leave()
 }
 

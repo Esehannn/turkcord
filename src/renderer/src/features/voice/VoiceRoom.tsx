@@ -37,7 +37,7 @@ export function VoiceRoom({ channelId, me }: { channelId: string; me: string }) 
               onClick={() => setMenu(menu === p.userId ? null : p.userId)}
               className="flex w-full items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm text-muted hover:bg-hover hover:text-fg"
             >
-              <span className={`rounded-full ring-2 transition-shadow ${talking ? 'speaking-glow ring-online' : 'ring-transparent'}`}>
+              <span className={`flex shrink-0 rounded-full ${talking ? 'speaking-glow' : ''}`}>
                 <Avatar name={name} path={profile?.avatar_path} size={22} />
               </span>
               <span className={`min-w-0 flex-1 truncate ${talking ? 'font-semibold text-fg' : ''} ${connecting ? 'opacity-60' : ''}`}>

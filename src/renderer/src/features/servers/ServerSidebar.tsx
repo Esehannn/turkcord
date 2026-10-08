@@ -201,7 +201,9 @@ function ChannelButton({
         active ? 'bg-selected text-fg' : unread ? 'text-fg hover:bg-hover' : 'text-muted hover:bg-hover hover:text-fg'
       }`}
     >
-      {unread && !active && <span className="absolute -left-2 h-2 w-1 rounded-r-full bg-fg" />}
+      {unread && !active && (
+        <span className={`absolute -left-2 w-1 rounded-r-full ${mentions > 0 ? 'anim-attention h-5 bg-accent' : 'h-2 bg-fg'}`} />
+      )}
       <button type="button" onClick={onClick} className="flex min-w-0 flex-1 items-center gap-1.5 px-2 py-1.5 text-left">
         <Icon className="size-[18px] shrink-0 opacity-70" />
         <span className={`truncate text-[15px] ${unread ? 'font-semibold' : 'font-medium'}`}>{channel.name}</span>

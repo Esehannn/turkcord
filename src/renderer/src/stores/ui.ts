@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { Ringtone } from '@/lib/sounds'
 
 export type Theme = 'light' | 'dark'
 export type PresenceStatus = 'online' | 'idle' | 'dnd' | 'invisible'
@@ -25,6 +26,15 @@ type Prefs = {
   notifications: boolean
   sounds: boolean
   memberList: boolean
+  // Bildirim ve efekt seslerinin seviyesi (0-1).
+  volume: number
+  // Uygulama açıkken sağ üstte beliren bildirim kartları.
+  banners: boolean
+  // Sunucu kanallarındaki her mesajda (etiket olmasa da) bildir.
+  notifyAll: boolean
+  // Ses kanalındaki ses efektlerini duy.
+  effects: boolean
+  ringtone: Ringtone
 }
 
 const PREFS_KEY = 'turkcord-tercihler'
@@ -47,7 +57,19 @@ function writeJson(key: string, value: unknown): void {
   }
 }
 
-const defaultPrefs: Prefs = { theme: 'light', status: 'online', notifications: true, sounds: true, memberList: true }
+const defaultPrefs: Prefs = {
+  theme: 'light',
+  status: 'online',
+  notifications: true,
+  sounds: true,
+  memberList: true,
+  volume: 0.8,
+  banners: true,
+  notifyAll: false,
+  effects: true,
+  ringtone: 'mehter',
+}
+const PREF_KEYS = Object.keys(defaultPrefs) as (keyof Prefs)[]
 
 type UiState = Prefs & {
   view: View
@@ -70,12 +92,13 @@ export const useUi = create<UiState>((set, get) => ({
   closeModal: () => set({ modal: null }),
   setPrefs: (prefs) => {
     set(prefs)
-    const { theme, status, notifications, sounds, memberList } = { ...get(), ...prefs }
-    writeJson(PREFS_KEY, { theme, status, notifications, sounds, memberList })
+    const state = get()
+    writeJson(PREFS_KEY, Object.fromEntries(PREF_KEYS.map((key) => [key, state[key]])))
     if (prefs.theme) applyTheme(prefs.theme)
   },
 }))
 
 export function applyTheme(theme: Theme): void {
   document.documentElement.dataset.theme = theme
+  window.turkcord?.setTheme?.(theme)
 }
