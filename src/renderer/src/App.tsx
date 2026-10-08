@@ -22,8 +22,7 @@ export function App() {
   const update = useStartupUpdate()
 
   let screen
-  if (update) screen = update
-  else if (!isConfigured) screen = <MissingConfig />
+  if (!isConfigured) screen = <MissingConfig />
   else if (loading) screen = <Splash text="Oturum açılıyor…" />
   else if (!session) screen = <AuthScreen />
   else screen = <MainLayout key={session.user.id} userId={session.user.id} />
@@ -32,7 +31,11 @@ export function App() {
     <div className="flex h-full flex-col">
       <TitleBar />
       <UpdateBanner />
-      <div className="min-h-0 flex-1">{screen}</div>
+      <div className="relative min-h-0 flex-1">
+        {screen}
+        {/* Denetim sürerken uygulama arkada yüklenmeye devam eder; açılış ekranı üstünü örter. */}
+        {update && <div className="absolute inset-0 z-[80]">{update}</div>}
+      </div>
       <ConfirmHost />
       <Toaster />
     </div>
@@ -40,7 +43,7 @@ export function App() {
 }
 
 // Güncelleme denetimi bu kadar sürerse (ör. internet yavaş) beklemeden uygulamaya geçilir.
-const CHECK_TIMEOUT_MS = 12_000
+const CHECK_TIMEOUT_MS = 6_000
 
 // Açılışta güncelleme denetimi: yeni sürüm varsa açılış ekranında indirilir, kurulur ve uygulama yeniden başlar.
 // Gösterilecek bir şey varsa açılış ekranını, yoksa (denetim bitti ya da atlandı) null döner.
