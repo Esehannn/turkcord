@@ -75,10 +75,10 @@ export function CallBar({ call, me }: { call: ActiveCall; me: string }) {
         </>
       ) : (
         <>
-          <RoundButton label={off ? 'Mikrofonu aç' : 'Mikrofonu kapat'} tone={off ? 'active' : 'plain'} onClick={() => setMuted(!off)}>
+          <RoundButton label={off ? 'Mikrofonu aç' : 'Mikrofonu kapat'} tone={off ? 'active' : 'plain'} onClick={() => setMuted(!(useVoice.getState().muted || useVoice.getState().deafened))}>
             {off ? <MicOff className="size-5" /> : <Mic className="size-5" />}
           </RoundButton>
-          <RoundButton label={deafened ? 'Sesi aç' : 'Sağırlaştır'} tone={deafened ? 'active' : 'plain'} onClick={() => setDeafened(!deafened)}>
+          <RoundButton label={deafened ? 'Sesi aç' : 'Sağırlaştır'} tone={deafened ? 'active' : 'plain'} onClick={() => setDeafened(!useVoice.getState().deafened)}>
             {deafened ? <HeadphoneOff className="size-5" /> : <Headphones className="size-5" />}
           </RoundButton>
           <RoundButton label="Aramayı kapat" tone="danger" onClick={() => void hangUp()}>

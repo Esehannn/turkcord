@@ -24,6 +24,12 @@ export function UserPanel({ userId }: { userId: string }) {
   const deafened = useVoice((s) => s.deafened)
 
   if (!profile) return null
+  // Tıklama anındaki gerçek durum okunur; art arda hızlı tıklamalarda ekrandaki eski değere güvenilmez.
+  const toggleMic = () => {
+    const now = useVoice.getState()
+    setMuted(!(now.muted || now.deafened))
+  }
+  const toggleDeafen = () => setDeafened(!useVoice.getState().deafened)
   const current = STATUS_OPTIONS.find((o) => o.value === status) ?? STATUS_OPTIONS[0]
 
   return (
@@ -44,14 +50,14 @@ export function UserPanel({ userId }: { userId: string }) {
         <IconButton
           label={muted || deafened ? 'Mikrofonu aç' : 'Mikrofonu kapat'}
           className={muted || deafened ? 'text-accent hover:text-accent' : ''}
-          onClick={() => setMuted(!(muted || deafened))}
+          onClick={toggleMic}
         >
           {muted || deafened ? <MicOff className="size-[18px]" /> : <Mic className="size-[18px]" />}
         </IconButton>
         <IconButton
           label={deafened ? 'Sesi aç' : 'Sağırlaştır (kimseyi duyma)'}
           className={deafened ? 'text-accent hover:text-accent' : ''}
-          onClick={() => setDeafened(!deafened)}
+          onClick={toggleDeafen}
         >
           {deafened ? <HeadphoneOff className="size-[18px]" /> : <Headphones className="size-[18px]" />}
         </IconButton>

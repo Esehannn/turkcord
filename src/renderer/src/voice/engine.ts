@@ -1,9 +1,10 @@
 import type { RealtimeChannel } from '@supabase/supabase-js'
+import { coalesce } from '@/lib/coalesce'
 import { isEffectId, playEffect, type EffectId } from '@/lib/sounds'
 import { supabase } from '@/lib/supabase'
 import { toast } from '@/stores/toast'
 import { micErrorMessage, openMicrophone, type Microphone } from './mic'
-import { trackVoice, untrackVoice, watchVoiceRoom } from './presence'
+import { applyVoiceState, trackVoice, untrackVoice, watchVoiceRoom } from './presence'
 import { tuneOpus } from './sdp'
 import { voiceSounds } from './sounds'
 import { micOpen, useVoice, volumeOf, type PeerLink } from './store'
@@ -183,7 +184,14 @@ function isInRoom(userId: string): boolean {
   return !!channelId && !!rooms[channelId]?.some((p) => p.userId === userId)
 }
 
+// Bağlantı var ama kopmuşsa (karşı taraf kapattıysa) önce temizlenir ki yenisi kurulabilsin.
+function dropIfDead(userId: string): void {
+  const state = peers.get(userId)?.pc.connectionState
+  if (state === 'disconnected' || state === 'failed' || state === 'closed') closePeer(userId)
+}
+
 async function offer(userId: string): Promise<void> {
+  dropIfDead(userId)
   if (peers.has(userId) || !mic) return
   const peer = createPeer(userId)
   const description = await peer.pc.createOffer()
@@ -205,6 +213,8 @@ async function onSignal(message: Signal): Promise<void> {
     switch (message.type) {
       case 'hazir':
         send({ type: 'merhaba', from: me, to: message.from })
+        // Yeni gelen, susturma durumumu presence'tan geç öğrenebilir; hemen bildir.
+        stateBroadcaster.trigger()
         if (me < message.from) await offer(message.from)
         break
       case 'merhaba':
@@ -241,6 +251,16 @@ async function onSignal(message: Signal): Promise<void> {
   }
 }
 
+// Odada olduğu halde sağlıklı bir bağlantım olmayan kişiyle el sıkışmayı yeniden başlatır.
+// Teklifi her zaman kimliği küçük olan gönderir; diğeri "merhaba" ile onu dürter.
+function reconnect(userId: string): void {
+  if (!signal || useVoice.getState().status !== 'connected' || !isInRoom(userId)) return
+  dropIfDead(userId)
+  if (peers.has(userId)) return
+  if (me < userId) void offer(userId)
+  else send({ type: 'merhaba', from: me, to: userId })
+}
+
 // Kanaldan çıkanların bağlantısını kapat, girenler için ses efekti çal.
 let lastRoom = new Set<string>()
 function onRoomChange(): void {
@@ -252,6 +272,8 @@ function onRoomChange(): void {
   if (status === 'connected') {
     for (const userId of now) if (!lastRoom.has(userId) && userId !== me) voiceSounds.join()
     for (const userId of lastRoom) if (!now.has(userId) && userId !== me) voiceSounds.leave()
+    // Odada görünen ama bağlı olmadığım biri varsa (ör. bağlantısı bir an koptuysa) yeniden bağlan.
+    for (const userId of now) if (!lastRoom.has(userId) && userId !== me) setTimeout(() => reconnect(userId), 1200)
   }
   lastRoom = now
 }
@@ -259,9 +281,38 @@ useVoice.subscribe((state, prev) => {
   if (state.rooms !== prev.rooms) onRoomChange()
 })
 
+// Susturma/sağırlaştırma durumunu kanaldakilere bildirir. İki yoldan gider:
+//  - Anında: ses sinyal kanalında yayın ("durum"). Sınırı yoktur; düğmeye hızlı basılsa bile en fazla
+//    150 ms'de bir ve her zaman en son durum gönderilir.
+//  - Seyrek: presence kaydı (kanala sonradan bakanlar için). Supabase 30 saniyede 5 presence çağrısından
+//    fazlasına izin vermediği için burada seyreltilir (bkz. presence.ts).
+const stateBroadcaster = coalesce(() => {
+  const { channelId, status, muted, deafened } = useVoice.getState()
+  if (!channelId || status !== 'connected' || !signal) return
+  void signal.send({ type: 'broadcast', event: 'durum', payload: { from: me, muted, deafened, at: Date.now() } })
+}, 150)
+
 function publishState(): void {
   const { channelId, muted, deafened } = useVoice.getState()
-  if (channelId) void trackVoice(channelId, me, { muted, deafened }, dmRoom)
+  if (!channelId) return
+  void trackVoice(channelId, me, { muted, deafened }, dmRoom)
+  stateBroadcaster.trigger()
+}
+
+function onPeerState(payload: unknown): void {
+  const { from, muted, deafened, at } = (payload ?? {}) as { from?: unknown; muted?: unknown; deafened?: unknown; at?: unknown }
+  const { channelId } = useVoice.getState()
+  if (!channelId || typeof from !== 'string' || from === me || typeof at !== 'number') return
+  applyVoiceState(channelId, from, { muted: muted === true, deafened: deafened === true, at })
+}
+
+// Aç/kapa sesleri üst üste binmesin: hızlı tıklamalarda sadece aralıklı olanlar çalar.
+let lastToggleSound = 0
+function toggleSound(play: () => void): void {
+  const now = Date.now()
+  if (now - lastToggleSound < 180) return
+  lastToggleSound = now
+  play()
 }
 
 function applyMicrophone(): void {
@@ -398,6 +449,7 @@ export async function joinVoice(serverId: string | null, channelId: string, user
   channel
     .on('broadcast', { event: 'sinyal' }, ({ payload }) => void onSignal(payload as Signal))
     .on('broadcast', { event: 'efekt' }, ({ payload }) => onEffect(payload))
+    .on('broadcast', { event: 'durum' }, ({ payload }) => onPeerState(payload))
     .subscribe((status) => {
       if (status === 'SUBSCRIBED' && token === joinToken) {
         send({ type: 'hazir', from: me })
@@ -415,6 +467,7 @@ export async function joinVoice(serverId: string | null, channelId: string, user
 export async function leaveVoice(playSound = true): Promise<void> {
   const { channelId } = useVoice.getState()
   joinToken++
+  stateBroadcaster.cancel()
   for (const userId of [...peers.keys()]) closePeer(userId)
   if (channelId) await untrackVoice(channelId).catch(() => {})
   unwatch?.()
@@ -439,8 +492,7 @@ export function setMuted(muted: boolean): void {
   applyMicrophone()
   for (const [userId, peer] of peers) applyOutput(peer.audio, userId)
   publishState()
-  if (muted) voiceSounds.mute()
-  else voiceSounds.unmute()
+  toggleSound(muted ? voiceSounds.mute : voiceSounds.unmute)
 }
 
 export function setDeafened(deafened: boolean): void {
@@ -448,8 +500,7 @@ export function setDeafened(deafened: boolean): void {
   applyMicrophone()
   for (const [userId, peer] of peers) applyOutput(peer.audio, userId)
   publishState()
-  if (deafened) voiceSounds.mute()
-  else voiceSounds.unmute()
+  toggleSound(deafened ? voiceSounds.mute : voiceSounds.unmute)
 }
 
 export function setUserVolume(userId: string, volume: number): void {

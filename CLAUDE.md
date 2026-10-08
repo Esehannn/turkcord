@@ -22,7 +22,7 @@ Arayüz metinleri, kod yorumları ve commit mesajları Türkçe.
 ## Sesler ve dosyalar
 
 - Uygulamada ses dosyası yok: bildirim sesleri, arama melodisi ve ses efektleri `src/renderer/src/lib/sounds.ts`'te sentezlenir.
-- Alias (`@/`) kullanmayan saf yardımcılar (`lib/files.ts`, `lib/format.ts`, `lib/markdown.ts`) `node --test` ile doğrudan test edilir;
+- Alias (`@/`) kullanmayan saf yardımcılar (`lib/files.ts`, `lib/coalesce.ts`, `lib/format.ts`, `lib/markdown.ts`) `node --test` ile doğrudan test edilir;
   bu dosyalara alias'lı içe aktarım ekleme.
 - Bireysel aramalar ses kanallarıyla aynı motoru kullanır (`voice/engine.ts`, `serverId` null); çaldırma `calls` tablosundan geçer (`voice/call.ts`).
 
