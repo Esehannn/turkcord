@@ -177,9 +177,16 @@ textarea:focus-visible {
     transform: translateY(4px) scale(0.98);
   }
 }
+/* Konuşan kişi: avatara yapışık ince yeşil halka, hafifçe nefes alır. */
 @keyframes tc-speaking {
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px var(--color-online);
+  }
   50% {
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-online) 35%, transparent);
+    box-shadow:
+      0 0 0 2px var(--color-online),
+      0 0 0 4px color-mix(in srgb, var(--color-online) 28%, transparent);
   }
 }
 .anim-fade {
@@ -239,7 +246,7 @@ textarea:focus-visible {
     background-position: -200% 0;
   }
 }
-/* Okunmamışı olan sohbetin solundaki çubuk dikkat çekmek için hafifçe yanıp söner. */
+/* Okunmamışı olan sohbetin solundaki çubuk dikkat çekmek için birkaç kez yanıp söner, sonra sabit kalır. */
 @keyframes tc-attention {
   50% {
     opacity: 0.45;
@@ -269,7 +276,7 @@ textarea:focus-visible {
   animation: tc-ring 1.3s ease-out infinite;
 }
 .anim-attention {
-  animation: tc-attention 1.6s ease-in-out infinite;
+  animation: tc-attention 1.6s ease-in-out 4;
 }
 .skeleton {
   border-radius: 6px;

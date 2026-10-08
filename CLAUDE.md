@@ -26,6 +26,14 @@ Arayüz metinleri, kod yorumları ve commit mesajları Türkçe.
   bu dosyalara alias'lı içe aktarım ekleme.
 - Bireysel aramalar ses kanallarıyla aynı motoru kullanır (`voice/engine.ts`, `serverId` null); çaldırma `calls` tablosundan geçer (`voice/call.ts`).
 
+## Performans
+
+RAM ve işlemci kullanımı bu projede önceliklidir (arkadaşlar oyun oynarken arkada açık duruyor):
+
+- Ağır şeyleri (video/ses oynatıcı, büyük liste, ağ isteği) ancak gerektiğinde oluştur; "tıklayınca yükle" varsayılandır.
+- Sonsuz dönen animasyonları sadece geçici ekranlarda kullan (yükleme, arama); kalıcı arayüzde sonlu tut.
+- Yeni bağımlılık eklemeden önce paket boyutuna etkisine bak; `npm run build` çıktısındaki boyutu karşılaştır.
+
 ## Ortak kurallar
 
 `src/shared/password.ts` ve `supabase/functions/_shared/password.ts` aynı kalmalı (testi var).

@@ -93,7 +93,7 @@ export function CallBar({ call, me }: { call: ActiveCall; me: string }) {
 function Party({ name, path, talking, dim, ringing }: { name: string; path?: string | null; talking: boolean; dim?: boolean; ringing?: boolean }) {
   return (
     <span
-      className={`rounded-full ring-2 transition-shadow ${talking ? 'speaking-glow ring-online' : 'ring-sidebar'} ${ringing ? 'anim-ring' : ''} ${
+      className={`flex shrink-0 rounded-full ${talking ? 'speaking-glow' : 'ring-2 ring-sidebar'} ${ringing ? 'anim-ring' : ''} ${
         dim ? 'opacity-60' : ''
       }`}
     >
