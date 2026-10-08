@@ -13,7 +13,8 @@ type Tone = {
   g?: number
 }
 type Noise = { t: number; d: number; g?: number; hp?: number; lp?: number }
-type Score = { tones?: Tone[]; noises?: Noise[]; length: number }
+// cutoff: bu frekansın üstü kısılır (Hz); sesi yumuşatır, kulak tırmalayan tizleri alır.
+type Score = { tones?: Tone[]; noises?: Noise[]; length: number; cutoff?: number }
 
 let ctx: AudioContext | null = null
 let noiseBuffer: AudioBuffer | null = null
@@ -39,7 +40,18 @@ function schedule(score: Score, volume: number, at?: number): () => void {
   const start = at ?? ac.currentTime + 0.02
   const master = ac.createGain()
   master.gain.value = Math.min(1, Math.max(0, volume))
-  master.connect(ac.destination)
+  // Çıkış zinciri: tiz kesici (yumuşaklık) → sınırlayıcı (üst üste binen sesler patlamasın) → hoparlör.
+  const soften = ac.createBiquadFilter()
+  soften.type = 'lowpass'
+  soften.frequency.value = score.cutoff ?? 7000
+  soften.Q.value = 0.5
+  const limiter = ac.createDynamicsCompressor()
+  limiter.threshold.value = -18
+  limiter.knee.value = 12
+  limiter.ratio.value = 8
+  limiter.attack.value = 0.003
+  limiter.release.value = 0.15
+  master.connect(soften).connect(limiter).connect(ac.destination)
 
   for (const tone of score.tones ?? []) {
     const osc = ac.createOscillator()
@@ -50,7 +62,7 @@ function schedule(score: Score, volume: number, at?: number): () => void {
     if (tone.to) osc.frequency.exponentialRampToValueAtTime(tone.to, t0 + tone.d)
     const peak = tone.g ?? 0.3
     gain.gain.setValueAtTime(0.0001, t0)
-    gain.gain.exponentialRampToValueAtTime(peak, t0 + Math.min(0.015, tone.d / 4))
+    gain.gain.exponentialRampToValueAtTime(peak, t0 + Math.min(0.03, tone.d / 4))
     gain.gain.setValueAtTime(peak, t0 + tone.d * 0.6)
     gain.gain.exponentialRampToValueAtTime(0.0001, t0 + tone.d)
     osc.connect(gain).connect(master)
@@ -88,13 +100,18 @@ function schedule(score: Score, volume: number, at?: number): () => void {
     source.stop(t0 + n.d + 0.03)
   }
 
-  const cleanup = setTimeout(() => master.disconnect(), (start - ac.currentTime + score.length + 0.5) * 1000)
+  const release = () => {
+    master.disconnect()
+    soften.disconnect()
+    limiter.disconnect()
+  }
+  const cleanup = setTimeout(release, (start - ac.currentTime + score.length + 0.5) * 1000)
   return () => {
     clearTimeout(cleanup)
     try {
       master.gain.cancelScheduledValues(ac.currentTime)
       master.gain.setTargetAtTime(0, ac.currentTime, 0.02)
-      setTimeout(() => master.disconnect(), 200)
+      setTimeout(release, 200)
     } catch {
       // Zaten kapanmış.
     }
@@ -111,14 +128,14 @@ function volume(): number {
 // ---------------------------------------------------------------------------
 
 // Aynı notayı üçgen + sinüsle çalar: tek sinüse göre daha dolgun ve duyulur.
-function chime(notes: [at: number, freq: number, len?: number][], gain = 0.34): Score {
+function chime(notes: [at: number, freq: number, len?: number][], gain = 0.26): Score {
   const tones: Tone[] = []
   let length = 0
   for (const [t, f, d = 0.22] of notes) {
-    tones.push({ t, d, f, type: 'triangle', g: gain }, { t, d: d * 1.4, f: f * 2, type: 'sine', g: gain * 0.35 })
+    tones.push({ t, d, f, type: 'triangle', g: gain }, { t, d: d * 1.4, f: f * 2, type: 'sine', g: gain * 0.2 })
     length = Math.max(length, t + d * 1.4)
   }
-  return { tones, length }
+  return { tones, length, cutoff: 4500 }
 }
 
 const NOTIFY = {
@@ -134,7 +151,7 @@ const NOTIFY = {
       [0.12, 1109, 0.16],
       [0.24, 1319, 0.36],
     ],
-    0.38,
+    0.28,
   ),
   // Arkadaşlık isteği: yumuşak iki nota.
   friend: chime([
@@ -236,18 +253,18 @@ function mehterScore(): Score {
       const t = beat * BEAT
       const d = i === 3 ? BEAT * 0.95 : BEAT * 0.8
       // Zurna yerine yumuşak, hafif genizden bir ses: kare + üçgen, bir oktav üstü ince.
-      tones.push({ t, d, f: f * 2, type: 'square', g: 0.075 }, { t, d, f: f * 2, type: 'triangle', g: 0.2 }, { t, d, f: f * 4, type: 'sine', g: 0.04 })
+      tones.push({ t, d, f: f * 2, type: 'square', g: 0.025 }, { t, d, f: f * 2, type: 'triangle', g: 0.2 }, { t, d, f: f * 4, type: 'sine', g: 0.03 })
       // Davul: güçlü vuruşta "düm" (pes), zayıf vuruşta "tek" (tiz).
       if (i % 2 === 0) {
-        tones.push({ t, d: 0.2, f: 110, to: 55, type: 'sine', g: 0.5 })
-        noises.push({ t, d: 0.06, g: 0.12, lp: 600 })
+        tones.push({ t, d: 0.2, f: 110, to: 55, type: 'sine', g: 0.38 })
+        noises.push({ t, d: 0.06, g: 0.08, lp: 600 })
       } else {
-        noises.push({ t, d: 0.05, g: 0.1, hp: 2500 })
+        noises.push({ t, d: 0.05, g: 0.05, hp: 2000 })
       }
       beat++
     })
   }
-  return { tones, noises, length: beat * BEAT }
+  return { tones, noises, length: beat * BEAT, cutoff: 4200 }
 }
 
 const KLASIK: Score = {
@@ -312,71 +329,78 @@ export function startRingback(): () => void {
 // Ses efektleri (ses kanalında herkese çalınır)
 // ---------------------------------------------------------------------------
 
+// Efektler bilerek yumuşak tutulur: ağırlıklı olarak üçgen ve sinüs dalga, az miktarda testere (karakter için),
+// 3-4 kHz üstü kesik. Ses kanalında konuşmanın üstüne bindiği için bildirimlerden de kısık çalar.
+const brass = (t: number, d: number, f: number, g: number): Tone[] => [
+  { t, d, f, type: 'triangle', g },
+  { t, d, f: f * 1.004, type: 'sawtooth', g: g * 0.22 },
+]
+
 const fanfare = (base: number): Tone[] =>
-  [0, 0.14, 0.28, 0.42].flatMap((t, i) => {
-    const f = base * [1, 1.26, 1.5, 2][i]
-    const d = i === 3 ? 0.5 : 0.13
-    return [
-      { t, d, f, type: 'sawtooth' as const, g: 0.14 },
-      { t, d, f: f * 1.005, type: 'square' as const, g: 0.07 },
-    ]
-  })
+  [0, 0.14, 0.28, 0.42].flatMap((t, i) => brass(t, i === 3 ? 0.5 : 0.13, base * [1, 1.26, 1.5, 2][i], 0.16))
 
 const EFFECT_SCORES = {
   korna: {
-    tones: [233, 277, 349, 466].flatMap((f) => [
-      { t: 0, d: 0.9, f, type: 'sawtooth' as const, g: 0.11 },
-      { t: 0, d: 0.9, f: f * 1.01, type: 'sawtooth' as const, g: 0.08 },
-    ]),
-    length: 0.9,
+    tones: [233, 277, 349].flatMap((f) => brass(0, 0.8, f, 0.11)),
+    length: 0.8,
+    cutoff: 2600,
   },
   alkis: {
-    noises: Array.from({ length: 22 }, (_, i) => ({ t: i * 0.085 + (i % 3) * 0.012, d: 0.06, g: 0.2 + (i % 4) * 0.03, hp: 900, lp: 5000 })),
+    noises: Array.from({ length: 22 }, (_, i) => ({ t: i * 0.085 + (i % 3) * 0.012, d: 0.06, g: 0.1 + (i % 4) * 0.015, hp: 700, lp: 3200 })),
     length: 2,
+    cutoff: 3600,
   },
   davul: {
     tones: [
-      { t: 0, d: 0.16, f: 180, to: 110, type: 'sine' as const, g: 0.5 },
-      { t: 0.2, d: 0.22, f: 130, to: 70, type: 'sine' as const, g: 0.55 },
+      { t: 0, d: 0.16, f: 180, to: 110, type: 'sine' as const, g: 0.4 },
+      { t: 0.2, d: 0.22, f: 130, to: 70, type: 'sine' as const, g: 0.45 },
     ],
     noises: [
-      { t: 0, d: 0.08, g: 0.2, lp: 1800 },
-      { t: 0.2, d: 0.09, g: 0.2, lp: 1200 },
-      { t: 0.48, d: 0.7, g: 0.2, hp: 6000 },
+      { t: 0, d: 0.08, g: 0.1, lp: 1500 },
+      { t: 0.2, d: 0.09, g: 0.1, lp: 1000 },
+      { t: 0.48, d: 0.6, g: 0.07, hp: 3000 },
     ],
     length: 1.2,
+    cutoff: 5200,
   },
   huzun: {
-    tones: [
-      [0, 311, 0.34],
-      [0.36, 294, 0.34],
-      [0.72, 277, 0.34],
-      [1.08, 262, 0.9],
-    ].flatMap(([t, f, d]) => [
-      { t, d, f, to: f * 0.97, type: 'sawtooth' as const, g: 0.16 },
-      { t, d, f: f / 2, type: 'triangle' as const, g: 0.14 },
+    tones: (
+      [
+        [0, 311, 0.34],
+        [0.36, 294, 0.34],
+        [0.72, 277, 0.34],
+        [1.08, 262, 0.9],
+      ] as const
+    ).flatMap(([t, f, d]) => [
+      { t, d, f, to: f * 0.97, type: 'triangle' as const, g: 0.2 },
+      { t, d, f: f / 2, type: 'sine' as const, g: 0.14 },
     ]),
     length: 2,
+    cutoff: 2400,
   },
-  zafer: { tones: fanfare(392), length: 1 },
+  zafer: { tones: fanfare(392), length: 1, cutoff: 3000 },
   lazer: {
-    tones: [0, 0.16, 0.32].map((t) => ({ t, d: 0.14, f: 1800, to: 240, type: 'square' as const, g: 0.14 })),
+    tones: [0, 0.16, 0.32].map((t) => ({ t, d: 0.14, f: 1200, to: 220, type: 'triangle' as const, g: 0.16 })),
     length: 0.5,
+    cutoff: 3000,
   },
   hata: {
     tones: [
-      { t: 0, d: 0.55, f: 110, type: 'sawtooth' as const, g: 0.2 },
-      { t: 0, d: 0.55, f: 116, type: 'square' as const, g: 0.1 },
+      { t: 0, d: 0.22, f: 196, type: 'triangle' as const, g: 0.22 },
+      { t: 0.24, d: 0.36, f: 147, type: 'triangle' as const, g: 0.22 },
+      { t: 0.24, d: 0.36, f: 73.5, type: 'sine' as const, g: 0.16 },
     ],
     length: 0.6,
+    cutoff: 2000,
   },
   ding: {
     tones: [
-      { t: 0, d: 1.1, f: 1568, type: 'sine' as const, g: 0.3 },
-      { t: 0, d: 0.7, f: 3136, type: 'sine' as const, g: 0.08 },
-      { t: 0, d: 0.9, f: 2093, type: 'triangle' as const, g: 0.06 },
+      { t: 0, d: 1.1, f: 1047, type: 'sine' as const, g: 0.24 },
+      { t: 0, d: 0.7, f: 2093, type: 'sine' as const, g: 0.05 },
+      { t: 0, d: 0.9, f: 1568, type: 'sine' as const, g: 0.05 },
     ],
     length: 1.1,
+    cutoff: 5000,
   },
   mehter: mehterScore(),
 } satisfies Record<string, Score>
@@ -403,7 +427,7 @@ export function playEffect(id: EffectId): void {
   const { effects, volume: v } = useUi.getState()
   if (!effects || v <= 0) return
   try {
-    schedule(EFFECT_SCORES[id], Math.min(1, v * 1.1))
+    schedule(EFFECT_SCORES[id], v * 0.6)
   } catch {
     // önemli değil
   }
