@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react'
+import { WifiOff } from 'lucide-react'
 import { useProfiles, useServers, useUnread } from '@/data/queries'
 import { usePresenceSync, useRealtimeSync } from '@/data/realtime'
 import { setUnreadBadge } from '@/lib/notify'
@@ -19,7 +20,7 @@ import { VoicePanel } from '@/features/voice/VoicePanel'
 import { initCalls } from '@/voice/call'
 import { leaveVoice } from '@/voice/engine'
 import { startDesktopBridge } from '@/lib/desktop'
-import { EmptyState } from '@/components/ui'
+import { Button, EmptyState } from '@/components/ui'
 import { Hash } from 'lucide-react'
 
 export function MainLayout({ userId }: { userId: string }) {
@@ -67,7 +68,20 @@ export function MainLayout({ userId }: { userId: string }) {
     }
   }, [servers.data, view, setView])
 
-  if (profiles.isLoading || servers.isLoading) return <Splash text="Sohbetler yükleniyor…" />
+  // İlk veriler gelene kadar arayüz kurulmaz. Yüklenemezse hata ekranı gösterilir ve seyrek aralıklarla
+  // yeniden denenir. (Eskiden arayüz her hatada kurulup yıkılıyor, bu da saniyede onlarca isteğe yol açıyordu.)
+  if (!profiles.data || !servers.data) {
+    const failed = (profiles.isError && !profiles.data) || (servers.isError && !servers.data)
+    if (!failed) return <Splash text="Sohbetler yükleniyor…" />
+    return (
+      <LoadError
+        onRetry={() => {
+          if (!profiles.data) void profiles.refetch()
+          if (!servers.data) void servers.refetch()
+        }}
+      />
+    )
+  }
 
   return (
     <div className="flex h-full">
@@ -91,6 +105,28 @@ export function MainLayout({ userId }: { userId: string }) {
       <ModalHost />
       <IncomingCall />
       <NotificationCards />
+    </div>
+  )
+}
+
+const RETRY_EVERY_MS = 15_000
+
+// Sunucuya ulaşılamadı: kullanıcı beklerken 15 saniyede bir kendiliğinden yeniden denenir.
+function LoadError({ onRetry }: { onRetry: () => void }) {
+  const retry = useRef(onRetry)
+  retry.current = onRetry
+  useEffect(() => {
+    const timer = setTimeout(() => retry.current(), RETRY_EVERY_MS)
+    return () => clearTimeout(timer)
+  }, [])
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-4 bg-chat p-8 text-center">
+      <div className="grid size-24 place-items-center rounded-full bg-accent-soft text-accent">
+        <WifiOff className="size-10" />
+      </div>
+      <p className="font-semibold text-fg">Sunucuya ulaşılamıyor</p>
+      <p className="max-w-sm text-sm text-muted">İnternet bağlantını kontrol et. Birkaç saniyede bir kendiliğinden yeniden denenecek.</p>
+      <Button onClick={onRetry}>Şimdi tekrar dene</Button>
     </div>
   )
 }
