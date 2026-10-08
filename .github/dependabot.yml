@@ -8,6 +8,11 @@ updates:
     groups:
       bagimliliklar:
         patterns: ['*']
+        update-types: [minor, patch]
+    # Büyük sürüm atlamaları (ör. Vite 8) elle, uyumluluk kontrol edilerek yapılır.
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
   - package-ecosystem: github-actions
     directory: /
     schedule:

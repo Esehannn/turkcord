@@ -50,6 +50,10 @@ jobs:
   gizli-bilgi:
     name: Gizli bilgi taraması
     runs-on: ubuntu-latest
+    # gitleaks PR'daki commit'leri listelemek için bu izni ister.
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@v5
         with:
