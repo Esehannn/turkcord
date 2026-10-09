@@ -2,6 +2,7 @@ import { useState, type FormEvent, type ReactNode } from 'react'
 import { Check, MessageCircle, Phone, UserMinus, UserPlus, Users, X } from 'lucide-react'
 import { Avatar, STATUS_LABEL } from '@/components/Avatar'
 import { confirmDialog } from '@/components/Modal'
+import { TeaGlass } from '@/components/TeaGlass'
 import { Badge, Button, EmptyState, IconButton, Input } from '@/components/ui'
 import { useActions } from '@/data/actions'
 import { useBlocks, useFriendships, useProfiles } from '@/data/queries'
@@ -130,7 +131,7 @@ function FriendList({ tab, me }: { tab: 'online' | 'all' | 'pending'; me: string
       all: { title: 'Henüz arkadaşın yok', text: '"Arkadaş Ekle" ile kullanıcı adını bildiğin kişilere istek gönder.' },
       pending: { title: 'Bekleyen istek yok', text: 'Gelen ve gönderdiğin istekler burada görünür.' },
     }[tab]
-    return <EmptyState icon={<Users className="size-12" />} title={text.title} text={text.text} />
+    return <EmptyState icon={tab === 'online' ? <TeaGlass /> : <Users className="size-12" />} title={text.title} text={text.text} />
   }
 
   const label = { online: 'Çevrimiçi', all: 'Tüm arkadaşlar', pending: 'Bekleyen' }[tab]

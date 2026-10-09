@@ -3,3 +3,6 @@ declare module '*.wasm?base64' {
   const base64: string
   export default base64
 }
+
+// Derleme sırasında package.json'daki sürümle değiştirilir.
+declare const __APP_VERSION__: string

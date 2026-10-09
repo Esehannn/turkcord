@@ -6,10 +6,11 @@ const BADGE_PREFIX = 'data:image/png;base64,'
 export const TITLE_BAR_HEIGHT = 32
 
 // Başlık çubuğundaki Windows düğmelerinin (küçült, büyüt, kapat) renkleri; arayüzdeki çubukla aynı.
-export function titleBarOverlay(theme: 'light' | 'dark'): Electron.TitleBarOverlayOptions {
+// Açık temada çubuk vurgu rengindedir (varsayılan kırmızı).
+export function titleBarOverlay(theme: 'light' | 'dark', accent = '#e30a17'): Electron.TitleBarOverlayOptions {
   return theme === 'dark'
     ? { color: '#121214', symbolColor: '#f2f2f3', height: TITLE_BAR_HEIGHT }
-    : { color: '#e30a17', symbolColor: '#ffffff', height: TITLE_BAR_HEIGHT }
+    : { color: accent, symbolColor: '#ffffff', height: TITLE_BAR_HEIGHT }
 }
 
 export function registerWindowIpc(getWindow: () => BrowserWindow | null): void {
@@ -39,12 +40,13 @@ export function registerWindowIpc(getWindow: () => BrowserWindow | null): void {
     setTrayUnread(count, image)
   })
 
-  // Tema değişince başlık çubuğu düğmelerinin rengi de değişir.
-  ipcMain.on('pencere:tema', (event, theme: unknown) => {
+  // Tema ya da vurgu rengi değişince başlık çubuğu düğmelerinin rengi de değişir.
+  ipcMain.on('pencere:tema', (event, theme: unknown, accent: unknown) => {
     const win = getWindow()
     if (process.platform !== 'win32' || !win || !isTrustedSender(event) || (theme !== 'light' && theme !== 'dark')) return
+    const color = typeof accent === 'string' && /^#[0-9a-f]{6}$/i.test(accent) ? accent : undefined
     try {
-      win.setTitleBarOverlay(titleBarOverlay(theme))
+      win.setTitleBarOverlay(titleBarOverlay(theme, color))
     } catch {
       // Başlık çubuğu özelleştirilmemişse (ör. başka platform) yok sayılır.
     }

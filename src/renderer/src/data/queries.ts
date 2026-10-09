@@ -1,10 +1,13 @@
 import { useQuery, useInfiniteQuery, type InfiniteData } from '@tanstack/react-query'
+import { likePattern } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
 import type {
   BlockRow,
+  ChannelReadRow,
   ChannelRow,
   FriendshipRow,
   MessageRow,
+  PollVoteRow,
   ProfileRow,
   ReactionRow,
   ServerMemberRow,
@@ -23,6 +26,9 @@ export const keys = {
   members: (serverId: string) => ['members', serverId] as const,
   roles: (serverId: string) => ['roles', serverId] as const,
   messages: (channelId: string) => ['messages', channelId] as const,
+  pins: (channelId: string) => ['pins', channelId] as const,
+  dmRead: (channelId: string) => ['dm-read', channelId] as const,
+  allChannels: ['all-channels'] as const,
   unread: ['unread'] as const,
 }
 
@@ -159,7 +165,11 @@ export function useUnread() {
 // Mesajlar: en yeniden eskiye sayfalar halinde (50'şer) yüklenir.
 // ---------------------------------------------------------------------------
 
-export type ChatMessage = MessageRow & { reactions: Pick<ReactionRow, 'id' | 'emoji' | 'user_id'>[] }
+export type ChatMessage = MessageRow & {
+  reactions: Pick<ReactionRow, 'id' | 'emoji' | 'user_id'>[]
+  // Anket oyları (anket olmayan mesajlarda boş).
+  votes: Pick<PollVoteRow, 'user_id' | 'option'>[]
+}
 export type MessagePages = InfiniteData<ChatMessage[], string | null>
 
 export const PAGE_SIZE = 50
@@ -171,7 +181,7 @@ export function useMessages(channelId: string) {
     queryFn: async ({ pageParam }): Promise<ChatMessage[]> => {
       let query = supabase
         .from('messages')
-        .select('*, reactions:message_reactions(id, emoji, user_id)')
+        .select('*, reactions:message_reactions(id, emoji, user_id), votes:poll_votes(user_id, option)')
         .eq('channel_id', channelId)
         .order('created_at', { ascending: false })
         .limit(PAGE_SIZE)
@@ -179,7 +189,66 @@ export function useMessages(channelId: string) {
       const rows = check(await query) as unknown as ChatMessage[]
       return rows
     },
-    getNextPageParam: (lastPage) => (lastPage.length === PAGE_SIZE ? lastPage[lastPage.length - 1].created_at : null),
+    // ">=": ilk sayfaya gerçek zamanlı gelen mesajlar eklendikçe sayfa 50'yi aşar; yine de eskileri vardır.
+    getNextPageParam: (lastPage) => (lastPage.length >= PAGE_SIZE ? lastPage[lastPage.length - 1].created_at : null),
     staleTime: Infinity,
+  })
+}
+
+// Sabitlenmiş mesajlar: liste ancak açılınca yüklenir.
+export function usePins(channelId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: keys.pins(channelId),
+    enabled,
+    queryFn: async (): Promise<MessageRow[]> =>
+      check(
+        await supabase
+          .from('messages')
+          .select('*')
+          .eq('channel_id', channelId)
+          .not('pinned_at', 'is', null)
+          .order('pinned_at', { ascending: false })
+          .limit(50),
+      ),
+  })
+}
+
+export const SEARCH_LIMIT = 25
+
+// Kanalda kelime arama (sunucuda yapılır; sonuçlar önbelleğe alınmaz).
+export async function searchMessages(channelId: string, query: string): Promise<MessageRow[]> {
+  return check(
+    await supabase
+      .from('messages')
+      .select('*')
+      .eq('channel_id', channelId)
+      .in('kind', ['text', 'poll'])
+      .ilike('content', likePattern(query))
+      .order('created_at', { ascending: false })
+      .limit(SEARCH_LIMIT),
+  )
+}
+
+// Özel mesajda karşı tarafın en son ne zaman okuduğu ("Görüldü" için).
+export function useDmRead(channelId: string, otherUserId: string | undefined) {
+  return useQuery({
+    queryKey: keys.dmRead(channelId),
+    enabled: !!otherUserId,
+    queryFn: async (): Promise<string | null> => {
+      const { data, error } = await supabase.from('channel_reads').select('*').eq('channel_id', channelId).eq('user_id', otherUserId!).maybeSingle()
+      if (error) throw error
+      return (data as ChannelReadRow | null)?.last_read_at ?? null
+    },
+    staleTime: Infinity,
+  })
+}
+
+// Erişebildiğim tüm sunucu kanalları (hızlı geçiş ve mesaj iletme için); ancak gerektiğinde yüklenir.
+export function useAllChannels(enabled: boolean) {
+  return useQuery({
+    queryKey: keys.allChannels,
+    enabled,
+    queryFn: async (): Promise<ChannelRow[]> =>
+      check(await supabase.from('channels').select('*').not('server_id', 'is', null).order('position', { ascending: true })),
   })
 }

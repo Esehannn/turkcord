@@ -54,6 +54,7 @@ function wasmBase64(): Plugin {
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_')
+  const { version } = JSON.parse(readFileSync(resolve('package.json'), 'utf8')) as { version: string }
   return {
     main: {
       build: { outDir: 'out/main' },
@@ -64,6 +65,8 @@ export default defineConfig(({ mode }) => {
     renderer: {
       root: 'src/renderer',
       build: { outDir: 'out/renderer', minify: true },
+      // Ayarlarda gösterilen sürüm numarası.
+      define: { __APP_VERSION__: JSON.stringify(version) },
       resolve: {
         alias: {
           '@': resolve('src/renderer/src'),

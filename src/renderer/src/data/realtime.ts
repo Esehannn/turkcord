@@ -2,15 +2,27 @@ import { useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
-import type { CallRow, ChannelRow, FriendshipRow, MessageRow, ProfileRow, ReactionRow, ServerMemberRow } from '@/lib/database.types'
+import type {
+  CallRow,
+  ChannelReadRow,
+  ChannelRow,
+  FriendshipRow,
+  MessageRow,
+  PollVoteRow,
+  ProfileRow,
+  ReactionRow,
+  ServerMemberRow,
+  VoiceJoinRow,
+} from '@/lib/database.types'
 import { coalesce } from '@/lib/coalesce'
 import { fileKind } from '@/lib/files'
 import { mentionsUser } from '@/lib/markdown'
 import { showNotification } from '@/lib/notify'
 import { usePresence, type OnlineStatus } from '@/stores/presence'
-import { useUi } from '@/stores/ui'
+import { isMuted, useUi } from '@/stores/ui'
 import { onCallRow } from '@/voice/call'
-import { addMessage, addReaction, bumpUnread, removeMessage, removeReaction, updateMessage } from './cache'
+import { useVoice } from '@/voice/store'
+import { addMessage, addReaction, bumpUnread, removeMessage, removeReaction, setVote, updateMessage } from './cache'
 import { keys } from './queries'
 
 const IDLE_AFTER_SECONDS = 10 * 60
@@ -65,10 +77,13 @@ export function useRealtimeSync(userId: string): void {
       const mentioned = !isCall && !!me && mentionsUser(row.content, me.username)
       bumpUnread(qc, row.channel_id, channel?.server_id ?? null, mentioned)
 
+      // Sessize alınan sohbet okunmamış olarak işaretlenir ama bildirim ve ses çıkarmaz.
+      if (isMuted(useUi.getState().muted, row.channel_id, channel?.server_id)) return
+
       const author = row.author_id ? profiles?.get(row.author_id) : undefined
       const name = author?.display_name ?? 'Biri'
       const avatar = { name, path: author?.avatar_path }
-      const body = row.content || attachmentText(row)
+      const body = row.kind === 'poll' ? `📊 Anket: ${row.content}` : row.content || attachmentText(row)
       const onClick = () => {
         if (!channel) return
         useUi
@@ -93,16 +108,54 @@ export function useRealtimeSync(userId: string): void {
       }
     }
 
+    // Bir arkadaş ses kanalına girdi: aynı kanalda değilsem haber ver.
+    const onVoiceJoin = async (row: VoiceJoinRow) => {
+      const ui = useUi.getState()
+      if (row.user_id === userId || !ui.voiceJoins) return
+      if (useVoice.getState().channelId === row.channel_id) return
+      const voiceChannel = await channelInfo(qc, row.channel_id)
+      if (!voiceChannel?.server_id || isMuted(ui.muted, row.channel_id, voiceChannel.server_id)) return
+      const who = qc.getQueryData<Map<string, ProfileRow>>(keys.profiles)?.get(row.user_id)
+      const name = who?.display_name ?? 'Biri'
+      const serverId = voiceChannel.server_id
+      showNotification({
+        title: `${name} sesli kanalda`,
+        body: `${voiceChannel.name ?? 'Ses kanalı'} kanalına girdi.`,
+        sound: 'voice',
+        avatar: { name, path: who?.avatar_path },
+        onClick: () => {
+          const view = useUi.getState().view
+          if (view.kind !== 'server' || view.serverId !== serverId) useUi.getState().setView({ kind: 'server', serverId, channelId: null })
+        },
+      })
+    }
+
     const channel: RealtimeChannel = supabase
       .channel(`db:${userId}`, { config: { private: true } })
       .on<MessageRow>('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (p) => {
         void onMessage(p.new)
       })
-      .on<MessageRow>('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, (p) =>
-        updateMessage(qc, p.new),
-      )
+      .on<MessageRow>('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, (p) => {
+        updateMessage(qc, p.new)
+        // Sabitleme değişmiş olabilir; liste açıksa (ya da önbellekteyse) yenilenir.
+        void qc.invalidateQueries({ queryKey: keys.pins(p.new.channel_id) })
+      })
       .on<MessageRow>('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages' }, (p) => {
         if (p.old.id) removeMessage(qc, p.old.id)
+        void qc.invalidateQueries({ queryKey: ['pins'] })
+      })
+      .on<PollVoteRow>('postgres_changes', { event: '*', schema: 'public', table: 'poll_votes' }, (p) => {
+        if (p.eventType === 'DELETE') {
+          if (p.old.message_id && p.old.user_id) setVote(qc, { message_id: p.old.message_id, user_id: p.old.user_id, option: null })
+        } else setVote(qc, p.new)
+      })
+      .on<ChannelReadRow>('postgres_changes', { event: '*', schema: 'public', table: 'channel_reads' }, (p) => {
+        // Özel mesajda karşı taraf okudu ("Görüldü"). Sadece o sohbet açılmışsa tutulur.
+        if (p.eventType === 'DELETE' || p.new.user_id === userId) return
+        if (qc.getQueryState(keys.dmRead(p.new.channel_id))) qc.setQueryData(keys.dmRead(p.new.channel_id), p.new.last_read_at)
+      })
+      .on<VoiceJoinRow>('postgres_changes', { event: '*', schema: 'public', table: 'voice_joins' }, (p) => {
+        if (p.eventType !== 'DELETE') void onVoiceJoin(p.new)
       })
       .on<ReactionRow>('postgres_changes', { event: 'INSERT', schema: 'public', table: 'message_reactions' }, (p) =>
         addReaction(qc, p.new),
@@ -150,6 +203,7 @@ export function useRealtimeSync(userId: string): void {
         const row = (p.eventType === 'DELETE' ? p.old : p.new) as Partial<ChannelRow>
         if (row.server_id) void qc.invalidateQueries({ queryKey: keys.channels(row.server_id) })
         else void qc.invalidateQueries({ queryKey: ['channels'] })
+        void qc.invalidateQueries({ queryKey: keys.allChannels })
         if (row.id) void qc.invalidateQueries({ queryKey: keys.channel(row.id) })
         const view = useUi.getState().view
         if (p.eventType === 'DELETE' && view.kind === 'server' && view.channelId === row.id) {

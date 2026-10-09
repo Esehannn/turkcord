@@ -25,10 +25,13 @@
   her tür dosya gönderme (25 MB), bireysel sesli arama ve mehter arama melodisi, ses efektleri, daha belirgin bildirimler
   (ayarlanabilir sesler, uygulama içi kartlar, tepsi rozeti), kendi başlık çubuğu, yükleme iskeletleri
 
+- [x] **7. Bulma ve düzen (0.6.0)**: sohbette arama (Ctrl+F), sabitlenmiş mesajlar, hızlı geçiş (Ctrl+K), anket, mesaj iletme,
+  özel mesajda "Görüldü", kanal/sunucu/sohbet sessize alma, sesli kanala giriş bildirimi, vurgu rengi, yazı boyutu ve
+  sıkışık görünüm, ayarlarda sürüm numarası
+
 ## Sıradaki fikirler
 
 - Sunucuya özel, yüklenebilen ses efektleri (şu an efektler uygulamayla gelen sabit bir set)
-- Mesaj arama, sabitlenmiş mesajlar
 - Grup aramaları (şu an arama iki kişi arasında; kalabalık için ses kanalları var)
 
 ## Dosya alanı

@@ -82,7 +82,7 @@ export function setUnreadBadge(count: number): void {
   canvas.height = size
   const ctx = canvas.getContext('2d')
   if (!ctx) return
-  ctx.fillStyle = '#e30a17'
+  ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--tc-accent').trim() || '#e30a17'
   ctx.beginPath()
   ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2)
   ctx.fill()

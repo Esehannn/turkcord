@@ -8,7 +8,7 @@ export function MessageContent({ content, me }: { content: string; me?: string }
   const tokens = useMemo(() => parseMessage(content), [content])
   const jumbo = useMemo(() => isEmojiOnly(content), [content])
   return (
-    <div className={`selectable break-words whitespace-pre-wrap ${jumbo ? 'text-4xl leading-tight' : 'text-[15px] leading-relaxed'} text-fg`}>
+    <div className={`selectable break-words whitespace-pre-wrap ${jumbo ? 'text-4xl leading-tight' : 'text-[length:var(--tc-chat-font)] leading-relaxed'} text-fg`}>
       {render(tokens, me)}
     </div>
   )

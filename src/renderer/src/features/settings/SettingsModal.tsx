@@ -22,7 +22,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import { useSession } from '@/stores/session'
 import { toast } from '@/stores/toast'
-import { useUi, type Theme } from '@/stores/ui'
+import { ACCENTS, useUi, type ChatFont, type Theme } from '@/stores/ui'
 import { checkPassword, PASSWORD_MESSAGES } from '@shared/password'
 import { AdminPanel } from './AdminPanel'
 import { VoiceSettings } from './VoiceSettings'
@@ -47,7 +47,7 @@ export function SettingsModal({ initialTab = 'profile', onClose }: { initialTab?
   return (
     <Modal title="Ayarlar" onClose={onClose} width="max-w-3xl">
       <div className="flex min-h-[420px] gap-6">
-        <nav className="w-44 shrink-0 space-y-0.5">
+        <nav className="flex w-44 shrink-0 flex-col gap-0.5">
           {tabs
             .filter((t) => t.show)
             .map((t) => (
@@ -63,6 +63,7 @@ export function SettingsModal({ initialTab = 'profile', onClose }: { initialTab?
                 {t.label}
               </button>
             ))}
+          <p className="selectable mt-auto px-3 pt-4 text-xs text-faint">Turkcord {__APP_VERSION__}</p>
         </nav>
         <div className="min-w-0 flex-1">
           {tab === 'profile' && <ProfileTab userId={me} />}
@@ -173,37 +174,96 @@ function ProfileTab({ userId }: { userId: string }) {
   )
 }
 
+const CHAT_FONTS: { value: ChatFont; label: string; size: string }[] = [
+  { value: 'small', label: 'Küçük', size: 'text-[13px]' },
+  { value: 'normal', label: 'Normal', size: 'text-[15px]' },
+  { value: 'large', label: 'Büyük', size: 'text-[17px]' },
+]
+
 function AppearanceTab() {
   const theme = useUi((s) => s.theme)
+  const accent = useUi((s) => s.accent)
+  const chatFont = useUi((s) => s.chatFont)
+  const compact = useUi((s) => s.compact)
   const setPrefs = useUi((s) => s.setPrefs)
   const options: { value: Theme; label: string; preview: string }[] = [
-    { value: 'light', label: 'Açık (beyaz + kırmızı)', preview: 'bg-white' },
-    { value: 'dark', label: 'Koyu (siyah + kırmızı)', preview: 'bg-[#1b1b1f]' },
+    { value: 'light', label: 'Açık', preview: 'bg-white' },
+    { value: 'dark', label: 'Koyu', preview: 'bg-[#1b1b1f]' },
   ]
   return (
-    <Section title="Görünüm">
-      <div className="grid grid-cols-2 gap-3">
-        {options.map((o) => (
-          <button
-            key={o.value}
-            type="button"
-            onClick={() => setPrefs({ theme: o.value })}
-            className={`overflow-hidden rounded-lg border-2 text-left transition-colors ${
-              theme === o.value ? 'border-accent' : 'border-line hover:border-faint'
-            }`}
-          >
-            <div className={`flex h-20 ${o.preview}`}>
-              <div className={`w-8 ${o.value === 'light' ? 'bg-[#e30a17]' : 'bg-[#121214]'}`} />
-              <div className="flex-1 space-y-2 p-3">
-                <div className="h-2 w-2/3 rounded bg-[#e30a17]/70" />
-                <div className={`h-2 w-1/2 rounded ${o.value === 'light' ? 'bg-black/15' : 'bg-white/20'}`} />
+    <div className="space-y-8">
+      <Section title="Tema">
+        <div className="grid grid-cols-2 gap-3">
+          {options.map((o) => (
+            <button
+              key={o.value}
+              type="button"
+              onClick={() => setPrefs({ theme: o.value })}
+              className={`overflow-hidden rounded-lg border-2 text-left transition-colors ${
+                theme === o.value ? 'border-accent' : 'border-line hover:border-faint'
+              }`}
+            >
+              <div className={`flex h-20 ${o.preview}`}>
+                <div className={`w-8 ${o.value === 'light' ? 'bg-accent' : 'bg-[#121214]'}`} />
+                <div className="flex-1 space-y-2 p-3">
+                  <div className="h-2 w-2/3 rounded bg-accent/70" />
+                  <div className={`h-2 w-1/2 rounded ${o.value === 'light' ? 'bg-black/15' : 'bg-white/20'}`} />
+                </div>
               </div>
-            </div>
-            <p className="px-3 py-2 text-sm font-medium text-fg">{o.label}</p>
-          </button>
-        ))}
-      </div>
-    </Section>
+              <p className="px-3 py-2 text-sm font-medium text-fg">{o.label}</p>
+            </button>
+          ))}
+        </div>
+      </Section>
+
+      <Section title="Vurgu rengi">
+        <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Vurgu rengi">
+          {ACCENTS.map((a) => (
+            <button
+              key={a.id}
+              type="button"
+              role="radio"
+              aria-checked={accent === a.id}
+              onClick={() => setPrefs({ accent: a.id })}
+              className={`flex items-center gap-2 rounded-full border-2 py-1 pr-3 pl-1 text-sm font-medium text-fg transition-colors ${
+                accent === a.id ? 'border-accent bg-accent-soft' : 'border-line hover:border-faint'
+              }`}
+            >
+              <span className="size-6 rounded-full" style={{ background: a.color }} />
+              {a.label}
+            </button>
+          ))}
+        </div>
+      </Section>
+
+      <Section title="Sohbet">
+        <div>
+          <p className="mb-2 text-sm font-medium text-fg">Yazı boyutu</p>
+          <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Yazı boyutu">
+            {CHAT_FONTS.map((f) => (
+              <button
+                key={f.value}
+                type="button"
+                role="radio"
+                aria-checked={chatFont === f.value}
+                onClick={() => setPrefs({ chatFont: f.value })}
+                className={`rounded-lg border-2 px-3 py-2 text-fg transition-colors ${f.size} ${
+                  chatFont === f.value ? 'border-accent bg-accent-soft' : 'border-line hover:border-faint'
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <Toggle
+          label="Sıkışık görünüm"
+          hint="Mesaj grupları arasındaki boşluğu azaltır; ekrana daha çok mesaj sığar."
+          checked={compact}
+          onChange={(v) => setPrefs({ compact: v })}
+        />
+      </Section>
+    </div>
   )
 }
 
@@ -214,7 +274,7 @@ function Toggle({ label, hint, checked, onChange }: { label: string; hint: strin
         <span className="block text-sm font-medium text-fg">{label}</span>
         <span className="block text-xs text-muted">{hint}</span>
       </span>
-      <input type="checkbox" className="size-5 accent-[#e30a17]" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      <input type="checkbox" className="size-5 accent-accent" checked={checked} onChange={(e) => onChange(e.target.checked)} />
     </label>
   )
 }
@@ -223,6 +283,7 @@ const SOUND_SAMPLES: { sound: NotifySound; label: string }[] = [
   { sound: 'message', label: 'Mesaj' },
   { sound: 'mention', label: 'Etiket' },
   { sound: 'friend', label: 'Arkadaşlık isteği' },
+  { sound: 'voice', label: 'Sesli kanala giriş' },
 ]
 
 function NotificationsTab() {
@@ -232,6 +293,7 @@ function NotificationsTab() {
   const volume = useUi((s) => s.volume)
   const notifyAll = useUi((s) => s.notifyAll)
   const effects = useUi((s) => s.effects)
+  const voiceJoins = useUi((s) => s.voiceJoins)
   const setPrefs = useUi((s) => s.setPrefs)
   return (
     <div className="space-y-8">
@@ -253,6 +315,12 @@ function NotificationsTab() {
           hint="Kapalıyken sunucularda sadece etiketlendiğin mesajlar bildirilir; diğerleri okunmamış olarak işaretlenir."
           checked={notifyAll}
           onChange={(v) => setPrefs({ notifyAll: v })}
+        />
+        <Toggle
+          label="Sesli kanala girenleri bildir"
+          hint="Sunucularından biri ses kanalına girince haber ver. Sessize aldığın sunucu ve kanallar için bildirilmez."
+          checked={voiceJoins}
+          onChange={(v) => setPrefs({ voiceJoins: v })}
         />
         <div className="flex justify-end">
           <Button
@@ -287,7 +355,7 @@ function NotificationsTab() {
               value={Math.round(volume * 100)}
               onChange={(e) => setPrefs({ volume: Number(e.target.value) / 100 })}
               onPointerUp={() => previewSound('message', volume)}
-              className="mt-2 w-full accent-[#e30a17]"
+              className="mt-2 w-full accent-accent"
             />
           </label>
           <div className="mt-3 flex flex-wrap gap-2">

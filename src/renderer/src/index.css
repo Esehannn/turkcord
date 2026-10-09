@@ -2,34 +2,37 @@
 @import '@fontsource-variable/inter';
 
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+@custom-variant compact (&:where([data-density='compact'] *));
 
-/* Açık tema (varsayılan): beyaz zemin, Türk kırmızısı vurgular. */
+/* Açık tema (varsayılan): beyaz zemin, Türk kırmızısı vurgular. Vurgu rengi ayarlardan değiştirilebilir;
+   ondan türeyen tonlar (üzerine gelince, soluk zemin, seçili satır) kendiliğinden hesaplanır. */
 :root {
   --tc-accent: #e30a17;
-  --tc-accent-hover: #c20812;
-  --tc-accent-soft: #fdecee;
+  --tc-accent-hover: color-mix(in srgb, var(--tc-accent) 85%, black);
+  --tc-accent-soft: color-mix(in srgb, var(--tc-accent) 8%, white);
   --tc-on-accent: #ffffff;
+  --tc-chat-font: 15px;
 
-  --tc-rail: #e30a17;
+  --tc-rail: var(--tc-accent);
   --tc-rail-item: rgba(255, 255, 255, 0.18);
   --tc-rail-item-hover: rgba(255, 255, 255, 0.3);
   --tc-rail-text: #ffffff;
   --tc-rail-active: #ffffff;
-  --tc-rail-active-text: #e30a17;
+  --tc-rail-active-text: var(--tc-accent);
 
   --tc-sidebar: #f4f4f5;
   --tc-chat: #ffffff;
   --tc-elevated: #ffffff;
   --tc-input: #efeff1;
   --tc-hover: rgba(24, 24, 27, 0.05);
-  --tc-selected: rgba(227, 10, 23, 0.1);
+  --tc-selected: color-mix(in srgb, var(--tc-accent) 10%, transparent);
   --tc-line: #e4e4e7;
 
   --tc-fg: #18181b;
   --tc-muted: #5f5f68;
   --tc-faint: #8e8e97;
 
-  --tc-mention: rgba(227, 10, 23, 0.07);
+  --tc-mention: color-mix(in srgb, var(--tc-accent) 7%, transparent);
   --tc-online: #23a55a;
   --tc-idle: #e6a01a;
   --tc-dnd: #e30a17;
@@ -40,17 +43,16 @@
   color-scheme: light;
 }
 
-/* Koyu tema: koyu zemin, aynı kırmızı vurgular. */
+/* Koyu tema: koyu zemin, aynı vurgular. */
 [data-theme='dark'] {
-  --tc-accent: #e30a17;
-  --tc-accent-hover: #f2303c;
-  --tc-accent-soft: rgba(227, 10, 23, 0.2);
+  --tc-accent-hover: color-mix(in srgb, var(--tc-accent) 85%, white);
+  --tc-accent-soft: color-mix(in srgb, var(--tc-accent) 20%, transparent);
 
   --tc-rail: #121214;
   --tc-rail-item: #26262b;
-  --tc-rail-item-hover: #e30a17;
+  --tc-rail-item-hover: var(--tc-accent);
   --tc-rail-text: #f2f2f3;
-  --tc-rail-active: #e30a17;
+  --tc-rail-active: var(--tc-accent);
   --tc-rail-active-text: #ffffff;
 
   --tc-sidebar: #1b1b1f;
@@ -58,19 +60,44 @@
   --tc-elevated: #2b2b31;
   --tc-input: #18181c;
   --tc-hover: rgba(255, 255, 255, 0.05);
-  --tc-selected: rgba(227, 10, 23, 0.22);
+  --tc-selected: color-mix(in srgb, var(--tc-accent) 22%, transparent);
   --tc-line: #34343b;
 
   --tc-fg: #f2f2f3;
   --tc-muted: #a9a9b2;
   --tc-faint: #77777f;
 
-  --tc-mention: rgba(227, 10, 23, 0.14);
+  --tc-mention: color-mix(in srgb, var(--tc-accent) 14%, transparent);
   --tc-offline: #6f6f78;
   --tc-success: #3ac477;
 
   --tc-shadow: 0 10px 34px rgba(0, 0, 0, 0.5);
   color-scheme: dark;
+}
+
+/* Vurgu renkleri (stores/ui.ts'teki ACCENTS ile aynı). */
+[data-accent='turuncu'] {
+  --tc-accent: #d9540b;
+}
+[data-accent='yesil'] {
+  --tc-accent: #1f8a4c;
+}
+[data-accent='turkuaz'] {
+  --tc-accent: #0e8f9e;
+}
+[data-accent='lacivert'] {
+  --tc-accent: #2456c9;
+}
+[data-accent='mor'] {
+  --tc-accent: #7a3fd1;
+}
+
+/* Sohbetteki yazı boyutu. */
+[data-chat-font='small'] {
+  --tc-chat-font: 13px;
+}
+[data-chat-font='large'] {
+  --tc-chat-font: 17px;
 }
 
 @theme inline {
@@ -208,6 +235,17 @@ textarea:focus-visible {
   -webkit-app-region: no-drag;
 }
 
+/* Atlanan mesaj (arama sonucu, sabitlenmiş mesaj, yanıt) kısa süre vurgulanır. */
+@keyframes tc-flash {
+  0%,
+  60% {
+    background: var(--tc-selected);
+  }
+}
+.anim-flash {
+  animation: tc-flash 1.8s ease-out;
+}
+
 /* Yeni gelen mesaj hafifçe aşağıdan belirir. */
 @keyframes tc-msg-in {
   from {
@@ -293,6 +331,7 @@ textarea:focus-visible {
   .anim-bump,
   .anim-ring,
   .anim-attention,
+  .anim-flash,
   .skeleton,
   .speaking-glow {
     animation: none;

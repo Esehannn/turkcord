@@ -160,6 +160,14 @@ const NOTIFY = {
   ]),
   // Sunucu kanalındaki sıradan mesaj (isteğe bağlı): tek, kısa nota.
   channel: chime([[0, 932, 0.16]], 0.22),
+  // Bir arkadaş ses kanalına girdi: alçaktan yükselen, yumuşak iki nota.
+  voice: chime(
+    [
+      [0, 523, 0.18],
+      [0.14, 784, 0.3],
+    ],
+    0.22,
+  ),
   // Arama bitti / reddedildi.
   hangup: chime(
     [

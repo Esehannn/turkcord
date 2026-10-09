@@ -152,7 +152,7 @@ export function VoiceSettings() {
             {testing ? 'Testi durdur' : 'Mikrofonu dene'}
           </Button>
           <label className="flex cursor-pointer items-center gap-2 text-sm text-muted">
-            <input type="checkbox" className="size-4 accent-[#e30a17]" checked={hearSelf} onChange={(e) => setHearSelf(e.target.checked)} />
+            <input type="checkbox" className="size-4 accent-accent" checked={hearSelf} onChange={(e) => setHearSelf(e.target.checked)} />
             Kendi sesimi duy
           </label>
         </div>
@@ -177,7 +177,7 @@ export function VoiceSettings() {
               <input
                 type="radio"
                 name="noise"
-                className="mt-0.5 size-4 accent-[#e30a17]"
+                className="mt-0.5 size-4 accent-accent"
                 checked={prefs.noiseMode === mode.value}
                 onChange={() => update({ noiseMode: mode.value })}
               />
@@ -199,7 +199,7 @@ export function VoiceSettings() {
           </span>
           <input
             type="checkbox"
-            className="size-5 accent-[#e30a17]"
+            className="size-5 accent-accent"
             checked={prefs.autoGate}
             onChange={(e) => prefs.setPrefs({ autoGate: e.target.checked })}
           />
@@ -213,7 +213,7 @@ export function VoiceSettings() {
               step={1}
               value={prefs.gateDb}
               onChange={(e) => prefs.setPrefs({ gateDb: Number(e.target.value) })}
-              className="flex-1 accent-[#e30a17]"
+              className="flex-1 accent-accent"
               aria-label="Giriş hassasiyeti"
             />
             <span className="w-14 text-right text-xs text-muted tabular-nums">{prefs.gateDb} dB</span>
@@ -239,7 +239,7 @@ export function VoiceSettings() {
               <input
                 type="radio"
                 name="input-mode"
-                className="mt-0.5 size-4 accent-[#e30a17]"
+                className="mt-0.5 size-4 accent-accent"
                 checked={prefs.inputMode === value}
                 onChange={() => prefs.setPrefs({ inputMode: value })}
               />
@@ -270,7 +270,7 @@ export function VoiceSettings() {
         </span>
         <input
           type="checkbox"
-          className="size-5 accent-[#e30a17]"
+          className="size-5 accent-accent"
           checked={prefs.echoCancellation}
           onChange={(e) => update({ echoCancellation: e.target.checked })}
         />

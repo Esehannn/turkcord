@@ -122,6 +122,14 @@ async function uploadWithProgress(path: string, file: Blob, type: string, onProg
   })
 }
 
+// Mesaj iletilirken ek, hedef kanalın klasörüne sunucuda kopyalanır (indirip yeniden yüklemeye gerek kalmaz).
+export async function copyAttachment(attachment: Attachment, channelId: string, userId: string): Promise<Attachment> {
+  const path = `${channelId}/${userId}/${randomName(extensionOf(attachment.path) || 'bin')}`
+  const { error } = await supabase.storage.from('ekler').copy(attachment.path, path)
+  if (error) throw new Error('Ek kopyalanamadı; dosya silinmiş olabilir.')
+  return { ...attachment, path }
+}
+
 export async function removeImage(bucket: 'gorseller' | 'ekler', path: string | null | undefined): Promise<void> {
   if (!path) return
   await supabase.storage.from(bucket).remove([path])
