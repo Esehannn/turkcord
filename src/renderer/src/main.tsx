@@ -4,7 +4,7 @@ import { QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-qu
 import './index.css'
 import { App } from './App'
 import { handleAuthError } from './lib/authGuard'
-import { applyTheme, useUi } from './stores/ui'
+import { applyAppearance } from './stores/ui'
 
 const queryClient = new QueryClient({
   // Oturum geçersizse (401) yenilemeyi dener, olmazsa giriş ekranına döner.
@@ -18,7 +18,7 @@ const queryClient = new QueryClient({
   },
 })
 
-applyTheme(useUi.getState().theme)
+applyAppearance()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

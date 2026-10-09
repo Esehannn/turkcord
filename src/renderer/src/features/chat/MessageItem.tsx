@@ -1,7 +1,7 @@
-import { memo, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
-import { createPortal } from 'react-dom'
-import { Check, Copy, CornerUpLeft, Pencil, Phone, PhoneMissed, PhoneOff, SmilePlus, Trash2, type LucideIcon } from 'lucide-react'
+import { memo, useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
+import { Check, CheckCheck, Copy, CornerUpLeft, Forward, Pencil, Phone, PhoneMissed, PhoneOff, Pin, PinOff, SmilePlus, Trash2 } from 'lucide-react'
 import { Avatar } from '@/components/Avatar'
+import { ContextMenu, type MenuItem } from '@/components/Menu'
 import { confirmDialog } from '@/components/Modal'
 import { IconButton, TextArea } from '@/components/ui'
 import { useActions } from '@/data/actions'
@@ -15,6 +15,7 @@ import { useUi } from '@/stores/ui'
 import { Attachments } from './Attachments'
 import { EmojiPicker, QUICK_REACTIONS } from './EmojiPicker'
 import { MessageContent } from './MessageContent'
+import { PollMessage } from './Poll'
 
 type Props = {
   message: ChatMessage
@@ -33,11 +34,18 @@ type Props = {
   nameColor?: string
   // Özel mesajda arama kaydının yanındaki "Geri ara" düğmesi.
   onCallBack?: () => void
+  // Bu sohbette mesaj sabitleyebilir miyim? (özel mesajda herkes, sunucuda sahip ve yöneticiler)
+  canPin: boolean
+  // Özel mesajda karşı taraf bu (son) mesajımı okudu.
+  seen?: boolean
+  // Yanıtlanan mesaja git (henüz yüklenmemişse yükleyip gösterir).
+  onJumpTo: (id: string) => void
 }
 
 // Yanıtlanan mesajın tek satırlık özeti.
 export function previewText(message: ChatMessage, mine: boolean): string {
   if (message.kind === 'call') return `📞 ${callText(message.content, mine)}`
+  if (message.kind === 'poll') return `📊 ${message.content}`
   if (message.content) return message.content
   const first = message.attachments[0]
   if (!first) return ''
@@ -69,6 +77,9 @@ export const MessageItem = memo(function MessageItem({
   profileName,
   nameColor,
   onCallBack,
+  canPin,
+  seen,
+  onJumpTo,
 }: Props) {
   const actions = useActions()
   const openModal = useUi((s) => s.openModal)
@@ -78,7 +89,8 @@ export const MessageItem = memo(function MessageItem({
   // Az önce gelen mesaj hafif bir animasyonla belirir (eski mesajlar yüklenirken değil).
   const [fresh] = useState(() => Date.now() - new Date(message.created_at).getTime() < 4000)
   const mine = message.author_id === me.id
-  const mentioned = !mine && message.kind === 'text' && mentionsUser(message.content, me.username)
+  const isText = message.kind === 'text'
+  const mentioned = !mine && isText && mentionsUser(message.content, me.username)
   const name = author?.display_name ?? 'Silinmiş kullanıcı'
   const showHeader = !grouped || !!message.reply_to
 
@@ -118,23 +130,30 @@ export const MessageItem = memo(function MessageItem({
         { label: 'Seçimi kopyala', icon: Copy, show: !!menu.selection, onClick: () => void copy(menu.selection) },
         { label: 'Metni kopyala', icon: Copy, show: !!message.content, onClick: () => void copy() },
         { label: 'Yanıtla', icon: CornerUpLeft, show: canPost, onClick: () => onReply(message) },
-        { label: 'Düzenle', icon: Pencil, show: canPost && mine && !!message.content, onClick: () => onEdit(message.id) },
+        { label: 'İlet', icon: Forward, show: isText, onClick: () => openModal({ kind: 'forward', message }) },
+        {
+          label: message.pinned_at ? 'Sabitlemeyi kaldır' : 'Sabitle',
+          icon: message.pinned_at ? PinOff : Pin,
+          show: canPin,
+          onClick: () => void actions.setPinned(message, !message.pinned_at).catch(() => undefined),
+        },
+        { label: 'Düzenle', icon: Pencil, show: canPost && mine && isText && !!message.content, onClick: () => onEdit(message.id) },
         { label: 'Sil', icon: Trash2, show: mine || canModerate, danger: true, onClick: () => void remove() },
-      ].filter((item) => item.show)
+      ]
     : []
 
   return (
     <div
       id={`mesaj-${message.id}`}
       onContextMenu={onContextMenu}
-      className={`group relative px-4 ${showHeader ? 'mt-3 pt-1' : ''} py-0.5 ${fresh ? 'anim-msg' : ''} ${
+      className={`group relative px-4 ${showHeader ? 'mt-3 pt-1 compact:mt-1' : ''} py-0.5 ${fresh ? 'anim-msg' : ''} ${
         mentioned ? 'border-l-2 border-accent bg-mention' : `border-l-2 border-transparent hover:bg-hover ${menu ? 'bg-hover' : ''}`
       }`}
     >
       {message.reply_to && (
         <button
           type="button"
-          onClick={() => document.getElementById(`mesaj-${message.reply_to}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+          onClick={() => message.reply_to && onJumpTo(message.reply_to)}
           className="mb-0.5 ml-12 flex max-w-full items-center gap-1.5 text-xs text-muted hover:text-fg"
         >
           <CornerUpLeft className="size-3.5 shrink-0" />
@@ -176,7 +195,24 @@ export const MessageItem = memo(function MessageItem({
             </div>
           )}
 
-          {editing ? (
+          {(message.forwarded || message.pinned_at) && (
+            <p className="flex items-center gap-3 text-[11px] font-medium text-faint">
+              {message.forwarded && (
+                <span className="flex items-center gap-1">
+                  <Forward className="size-3" /> İletildi
+                </span>
+              )}
+              {message.pinned_at && (
+                <span className="flex items-center gap-1 text-accent">
+                  <Pin className="size-3" /> Sabitlendi
+                </span>
+              )}
+            </p>
+          )}
+
+          {message.kind === 'poll' ? (
+            <PollMessage message={message} me={me.id} canVote={canPost} profileName={profileName} />
+          ) : editing ? (
             <EditBox message={message} onDone={() => onEdit(null)} />
           ) : (
             message.content && (
@@ -208,6 +244,12 @@ export const MessageItem = memo(function MessageItem({
               ))}
             </div>
           )}
+
+          {seen && (
+            <p className="mt-0.5 flex items-center gap-1 text-[11px] text-faint">
+              <CheckCheck className="size-3.5 text-accent" /> Görüldü
+            </p>
+          )}
         </div>
       </div>
 
@@ -237,7 +279,7 @@ export const MessageItem = memo(function MessageItem({
               {copied ? <Check className="size-4 text-success" /> : <Copy className="size-4" />}
             </IconButton>
           )}
-          {canPost && mine && message.content && (
+          {canPost && mine && isText && message.content && (
             <IconButton label="Düzenle" onClick={() => onEdit(message.id)}>
               <Pencil className="size-4" />
             </IconButton>
@@ -250,70 +292,10 @@ export const MessageItem = memo(function MessageItem({
         </div>
       )}
 
-      {menu && menuItems.length > 0 && <ContextMenu x={menu.x} y={menu.y} items={menuItems} onClose={() => setMenu(null)} />}
+      {menu && <ContextMenu x={menu.x} y={menu.y} items={menuItems} onClose={() => setMenu(null)} />}
     </div>
   )
 })
-
-type MenuItem = { label: string; icon: LucideIcon; show: boolean; danger?: boolean; onClick: () => void }
-
-function ContextMenu({ x, y, items, onClose }: { x: number; y: number; items: MenuItem[]; onClose: () => void }) {
-  const ref = useRef<HTMLDivElement>(null)
-  const [pos, setPos] = useState({ left: x, top: y })
-
-  // Menü pencerenin dışına taşmasın.
-  useLayoutEffect(() => {
-    const el = ref.current
-    if (!el) return
-    const { width, height } = el.getBoundingClientRect()
-    setPos({ left: Math.max(8, Math.min(x, window.innerWidth - width - 8)), top: Math.max(40, Math.min(y, window.innerHeight - height - 8)) })
-  }, [x, y])
-
-  useEffect(() => {
-    const onKey = (e: globalThis.KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    window.addEventListener('blur', onClose)
-    return () => {
-      window.removeEventListener('keydown', onKey)
-      window.removeEventListener('blur', onClose)
-    }
-  }, [onClose])
-
-  return createPortal(
-    <>
-      <div
-        className="fixed inset-0 z-50"
-        onClick={onClose}
-        onContextMenu={(e) => {
-          e.preventDefault()
-          onClose()
-        }}
-      />
-      <div ref={ref} role="menu" style={pos} className="anim-pop fixed z-50 w-52 rounded-lg border border-line bg-elevated p-1.5 shadow-pop">
-        {items.map((item) => (
-          <button
-            key={item.label}
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              onClose()
-              item.onClick()
-            }}
-            className={`flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-sm font-medium hover:bg-hover ${
-              item.danger ? 'text-accent' : 'text-fg'
-            }`}
-          >
-            {item.label}
-            <item.icon className="size-4" />
-          </button>
-        ))}
-      </div>
-    </>,
-    document.body,
-  )
-}
 
 // Arama kaydı: sohbetin ortasında, ince bir bilgi satırı.
 function CallMessage({ message, mine, name, fresh, onCallBack }: { message: ChatMessage; mine: boolean; name: string; fresh: boolean; onCallBack?: () => void }) {

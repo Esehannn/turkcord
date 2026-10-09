@@ -3,7 +3,7 @@ import { WifiOff } from 'lucide-react'
 import { useProfiles, useServers, useUnread } from '@/data/queries'
 import { usePresenceSync, useRealtimeSync } from '@/data/realtime'
 import { setUnreadBadge } from '@/lib/notify'
-import { useUi } from '@/stores/ui'
+import { isMuted, useUi } from '@/stores/ui'
 import { NotificationCards } from '@/components/NotificationCards'
 import { Splash } from '@/components/Splash'
 import { ChatView } from '@/features/chat/ChatView'
@@ -20,8 +20,8 @@ import { VoicePanel } from '@/features/voice/VoicePanel'
 import { initCalls } from '@/voice/call'
 import { leaveVoice } from '@/voice/engine'
 import { startDesktopBridge } from '@/lib/desktop'
+import { TeaGlass } from '@/components/TeaGlass'
 import { Button, EmptyState } from '@/components/ui'
-import { Hash } from 'lucide-react'
 
 export function MainLayout({ userId }: { userId: string }) {
   useRealtimeSync(userId)
@@ -32,6 +32,7 @@ export function MainLayout({ userId }: { userId: string }) {
   const view = useUi((s) => s.view)
   const setView = useUi((s) => s.setView)
   const memberList = useUi((s) => s.memberList)
+  const muted = useUi((s) => s.muted)
 
   // Oturum kapanınca ses kanalından da çık.
   useEffect(() => () => void leaveVoice(false), [])
@@ -56,10 +57,28 @@ export function MainLayout({ userId }: { userId: string }) {
   // Görev çubuğu rozeti: okunmamış DM'ler ve etiketlenmeler.
   const badge = useMemo(() => {
     let total = 0
-    for (const entry of unread.data?.values() ?? []) total += entry.server_id ? entry.mentions : entry.unread
+    for (const entry of unread.data?.values() ?? []) {
+      // Sessize alınan özel mesajlar rozete girmez; etiketlenmeler her zaman sayılır.
+      if (entry.server_id) total += entry.mentions
+      else if (!isMuted(muted, entry.channel_id)) total += entry.unread
+    }
     return total
-  }, [unread.data])
+  }, [muted, unread.data])
   useEffect(() => setUnreadBadge(badge), [badge])
+
+  // Ctrl+K: hızlı geçiş (sohbete ya da kanala atla).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        const ui = useUi.getState()
+        if (ui.modal?.kind === 'quick-switch') ui.closeModal()
+        else if (!ui.modal) ui.openModal({ kind: 'quick-switch' })
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   // Silinen ya da ayrılınan sunucudaysak ana sayfaya dön.
   useEffect(() => {
@@ -98,7 +117,7 @@ export function MainLayout({ userId }: { userId: string }) {
           (view.channelId ? (
             <ChatView key={view.channelId} channelId={view.channelId} serverId={view.serverId} />
           ) : (
-            <EmptyState icon={<Hash className="size-10" />} title="Bir kanal seç" text="Soldaki listeden bir yazı kanalı seç." />
+            <EmptyState icon={<TeaGlass />} title="Bir kanal seç" text="Soldaki listeden bir yazı kanalı seç ya da Ctrl+K ile ara." />
           ))}
         {view.kind === 'server' && memberList && <MemberList serverId={view.serverId} />}
       </main>

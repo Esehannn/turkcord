@@ -41,7 +41,7 @@ const api: TurkcordApi = {
     return () => ipcRenderer.removeListener('kisayol:basildi', listener)
   },
   reportVoiceStatus: (status) => ipcRenderer.send('ses:durum', status),
-  setTheme: (theme) => ipcRenderer.send('pencere:tema', theme),
+  setTheme: (theme, accent) => ipcRenderer.send('pencere:tema', theme, accent),
   requestAttention: () => ipcRenderer.send('pencere:dikkat'),
   showWindow: () => ipcRenderer.send('pencere:goster'),
 }

@@ -1,7 +1,20 @@
 import { create } from 'zustand'
+import type { MessageRow } from '@/lib/database.types'
 import type { Ringtone } from '@/lib/sounds'
 
 export type Theme = 'light' | 'dark'
+export type ChatFont = 'small' | 'normal' | 'large'
+
+// Vurgu rengi: düğmeler, seçili öğeler ve (açık temada) sol şerit ile başlık çubuğu bu renkte olur.
+export const ACCENTS = [
+  { id: 'kirmizi', label: 'Kırmızı', color: '#e30a17' },
+  { id: 'turuncu', label: 'Turuncu', color: '#d9540b' },
+  { id: 'yesil', label: 'Yeşil', color: '#1f8a4c' },
+  { id: 'turkuaz', label: 'Turkuaz', color: '#0e8f9e' },
+  { id: 'lacivert', label: 'Lacivert', color: '#2456c9' },
+  { id: 'mor', label: 'Mor', color: '#7a3fd1' },
+] as const
+export type Accent = (typeof ACCENTS)[number]['id']
 export type PresenceStatus = 'online' | 'idle' | 'dnd' | 'invisible'
 export type FriendsTab = 'online' | 'all' | 'pending' | 'blocked' | 'add'
 
@@ -18,7 +31,13 @@ export type Modal =
   | { kind: 'server-settings'; serverId: string }
   | { kind: 'settings'; tab?: 'profile' | 'voice' | 'appearance' | 'notifications' | 'account' | 'admin' }
   | { kind: 'profile'; userId: string }
+  | { kind: 'forward'; message: Pick<MessageRow, 'id' | 'content' | 'attachments'> }
+  | { kind: 'create-poll'; channelId: string }
+  | { kind: 'quick-switch' }
   | null
+
+// Bir mesaja atlama isteği (arama sonucu, sabitlenmiş mesaj); ilgili sohbet bunu görünce mesajı bulup gösterir.
+export type Jump = { channelId: string; messageId: string; createdAt: string }
 
 type Prefs = {
   theme: Theme
@@ -35,6 +54,15 @@ type Prefs = {
   // Ses kanalındaki ses efektlerini duy.
   effects: boolean
   ringtone: Ringtone
+  accent: Accent
+  // Sohbetteki yazı boyutu.
+  chatFont: ChatFont
+  // Sıkışık görünüm: mesaj grupları arasındaki boşluk azalır.
+  compact: boolean
+  // Sessize alınan kanal, özel mesaj ve sunucuların kimlikleri.
+  muted: string[]
+  // Bir arkadaş ses kanalına girince bildir.
+  voiceJoins: boolean
 }
 
 const PREFS_KEY = 'turkcord-tercihler'
@@ -68,12 +96,20 @@ const defaultPrefs: Prefs = {
   notifyAll: false,
   effects: true,
   ringtone: 'mehter',
+  accent: 'kirmizi',
+  chatFont: 'normal',
+  compact: false,
+  muted: [],
+  voiceJoins: true,
 }
 const PREF_KEYS = Object.keys(defaultPrefs) as (keyof Prefs)[]
 
 type UiState = Prefs & {
   view: View
   modal: Modal
+  jump: Jump | null
+  setJump: (jump: Jump | null) => void
+  toggleMuted: (id: string) => void
   setView: (view: View) => void
   openModal: (modal: Modal) => void
   closeModal: () => void
@@ -84,6 +120,12 @@ export const useUi = create<UiState>((set, get) => ({
   ...readJson<Prefs>(PREFS_KEY, defaultPrefs),
   view: readJson<{ view: View }>(VIEW_KEY, { view: { kind: 'home', tab: 'online' } }).view,
   modal: null,
+  jump: null,
+  setJump: (jump) => set({ jump }),
+  toggleMuted: (id) => {
+    const muted = get().muted
+    get().setPrefs({ muted: muted.includes(id) ? muted.filter((m) => m !== id) : [...muted, id] })
+  },
   setView: (view) => {
     set({ view })
     writeJson(VIEW_KEY, { view })
@@ -94,11 +136,22 @@ export const useUi = create<UiState>((set, get) => ({
     set(prefs)
     const state = get()
     writeJson(PREFS_KEY, Object.fromEntries(PREF_KEYS.map((key) => [key, state[key]])))
-    if (prefs.theme) applyTheme(prefs.theme)
+    if (prefs.theme || prefs.accent || prefs.chatFont || prefs.compact !== undefined) applyAppearance()
   },
 }))
 
-export function applyTheme(theme: Theme): void {
-  document.documentElement.dataset.theme = theme
-  window.turkcord?.setTheme?.(theme)
+// Bu kanal (ya da bulunduğu sunucu) sessize alınmış mı?
+export function isMuted(muted: string[], channelId: string, serverId?: string | null): boolean {
+  return muted.includes(channelId) || (!!serverId && muted.includes(serverId))
+}
+
+// Tema, vurgu rengi ve yazı boyutunu sayfaya (ve başlık çubuğundaki Windows düğmelerine) uygular.
+export function applyAppearance(): void {
+  const { theme, accent, chatFont, compact } = useUi.getState()
+  const root = document.documentElement
+  root.dataset.theme = theme
+  root.dataset.accent = accent
+  root.dataset.chatFont = chatFont
+  root.dataset.density = compact ? 'compact' : 'normal'
+  window.turkcord?.setTheme?.(theme, ACCENTS.find((a) => a.id === accent)?.color)
 }

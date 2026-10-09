@@ -102,7 +102,10 @@ export type Attachment = {
 }
 
 // text: normal mesaj. call: sistemin eklediği arama kaydı (içerik: missed | declined | ended:<saniye>).
-export type MessageKind = 'text' | 'call'
+// poll: anket (içerik: soru, seçenekler `poll` sütununda).
+export type MessageKind = 'text' | 'call' | 'poll'
+
+export type Poll = { options: string[] }
 
 export type MessageRow = {
   id: string
@@ -114,6 +117,25 @@ export type MessageRow = {
   reply_to: string | null
   edited_at: string | null
   created_at: string
+  pinned_at: string | null
+  pinned_by: string | null
+  // Başka bir sohbetten iletildi.
+  forwarded: boolean
+  poll: Poll | null
+}
+
+export type PollVoteRow = {
+  message_id: string
+  user_id: string
+  option: number
+  created_at: string
+}
+
+// Ses kanalına son giriş (giriş bildirimi için).
+export type VoiceJoinRow = {
+  channel_id: string
+  user_id: string
+  joined_at: string
 }
 
 export type ReactionRow = {
@@ -175,7 +197,7 @@ export type Database = {
       server_invites: Table<ServerInviteRow, never, never>
       messages: Table<
         MessageRow,
-        { channel_id: string; content?: string; attachments?: Attachment[]; reply_to?: string | null },
+        { channel_id: string; content?: string; attachments?: Attachment[]; reply_to?: string | null; forwarded?: boolean },
         { content?: string },
         [
           {
@@ -203,6 +225,21 @@ export type Database = {
       >
       channel_reads: Table<ChannelReadRow, never, never>
       calls: Table<CallRow, never, never>
+      poll_votes: Table<
+        PollVoteRow,
+        never,
+        never,
+        [
+          {
+            foreignKeyName: 'poll_votes_message_id_fkey'
+            columns: ['message_id']
+            isOneToOne: false
+            referencedRelation: 'messages'
+            referencedColumns: ['id']
+          },
+        ]
+      >
+      voice_joins: Table<VoiceJoinRow, never, never>
     }
     Views: { [_ in never]: never }
     Functions: {
@@ -271,6 +308,10 @@ export type Database = {
       start_call: { Args: { p_channel: string }; Returns: string }
       answer_call: { Args: { p_call: string; p_accept: boolean }; Returns: undefined }
       end_call: { Args: { p_call: string }; Returns: undefined }
+      set_message_pinned: { Args: { p_message: string; p_pinned: boolean }; Returns: undefined }
+      create_poll: { Args: { p_channel: string; p_question: string; p_options: string[] }; Returns: string }
+      vote_poll: { Args: { p_message: string; p_option: number | null }; Returns: undefined }
+      announce_voice_join: { Args: { p_channel: string }; Returns: undefined }
       admin_storage_usage: { Args: Record<string, never>; Returns: { bucket: string; files: number; bytes: number }[] }
     }
     Enums: { [_ in never]: never }

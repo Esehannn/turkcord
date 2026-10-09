@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { HeadphoneOff, MicOff } from 'lucide-react'
 import { Avatar } from '@/components/Avatar'
+import { Floating } from '@/components/Menu'
 import { useProfiles } from '@/data/queries'
 import { useUi } from '@/stores/ui'
 import { setUserVolume } from '@/voice/engine'
@@ -16,7 +17,7 @@ export function VoiceRoom({ channelId, me }: { channelId: string; me: string }) 
   const peers = useVoice((s) => s.peers)
   const links = useVoice((s) => s.links)
   const { data: profiles } = useProfiles()
-  const [menu, setMenu] = useState<string | null>(null)
+  const [menu, setMenu] = useState<{ userId: string; x: number; y: number } | null>(null)
 
   useEffect(() => watchVoiceRoom(channelId, me), [channelId, me])
 
@@ -31,10 +32,13 @@ export function VoiceRoom({ channelId, me }: { channelId: string; me: string }) 
         const talking = inThisRoom && !!speaking[p.userId] && !p.muted && !p.deafened
         const connecting = inThisRoom && p.userId !== me && peers[p.userId] && peers[p.userId] !== 'connected'
         return (
-          <li key={p.userId} className="relative">
+          <li key={p.userId}>
             <button
               type="button"
-              onClick={() => setMenu(menu === p.userId ? null : p.userId)}
+              onClick={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect()
+                setMenu({ userId: p.userId, x: rect.left, y: rect.bottom + 4 })
+              }}
               className="flex w-full items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm text-muted hover:bg-hover hover:text-fg"
             >
               <span className={`flex shrink-0 rounded-full ${talking ? 'speaking-glow' : ''}`}>
@@ -47,7 +51,7 @@ export function VoiceRoom({ channelId, me }: { channelId: string; me: string }) 
               {p.muted && <MicOff className="size-3.5 shrink-0 text-accent" aria-label="Mikrofonu kapalı" />}
               {p.deafened && <HeadphoneOff className="size-3.5 shrink-0 text-accent" aria-label="Sağırlaştırılmış" />}
             </button>
-            {menu === p.userId && <ParticipantMenu userId={p.userId} isMe={p.userId === me} onClose={() => setMenu(null)} />}
+            {menu?.userId === p.userId && <ParticipantMenu userId={p.userId} isMe={p.userId === me} x={menu.x} y={menu.y} onClose={() => setMenu(null)} />}
           </li>
         )
       })}
@@ -55,39 +59,37 @@ export function VoiceRoom({ channelId, me }: { channelId: string; me: string }) 
   )
 }
 
-function ParticipantMenu({ userId, isMe, onClose }: { userId: string; isMe: boolean; onClose: () => void }) {
+// Kanal listesinin dışına (sayfanın üstüne) çizilir; yoksa dar listenin kenarında kesilirdi.
+function ParticipantMenu({ userId, isMe, x, y, onClose }: { userId: string; isMe: boolean; x: number; y: number; onClose: () => void }) {
   const volume = useVoice((s) => s.volumes[userId] ?? 1)
   const openModal = useUi((s) => s.openModal)
   return (
-    <>
-      <div className="fixed inset-0 z-30" onClick={onClose} />
-      <div className="anim-pop absolute top-full left-0 z-40 mt-1 w-56 rounded-lg border border-line bg-elevated p-3 shadow-pop">
-        {!isMe && (
-          <label className="block">
-            <span className="flex justify-between text-xs font-semibold text-muted">
-              Ses seviyesi <span>{Math.round(volume * 100)}%</span>
-            </span>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              value={Math.round(volume * 100)}
-              onChange={(e) => setUserVolume(userId, Number(e.target.value) / 100)}
-              className="mt-2 w-full accent-[#e30a17]"
-            />
-          </label>
-        )}
-        <button
-          type="button"
-          onClick={() => {
-            onClose()
-            openModal({ kind: 'profile', userId })
-          }}
-          className={`w-full rounded-md px-2 py-1.5 text-left text-sm text-fg hover:bg-hover ${isMe ? '' : 'mt-2'}`}
-        >
-          Profili gör
-        </button>
-      </div>
-    </>
+    <Floating x={x} y={y} onClose={onClose} className="w-56 p-3">
+      {!isMe && (
+        <label className="block">
+          <span className="flex justify-between text-xs font-semibold text-muted">
+            Ses seviyesi <span>{Math.round(volume * 100)}%</span>
+          </span>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={Math.round(volume * 100)}
+            onChange={(e) => setUserVolume(userId, Number(e.target.value) / 100)}
+            className="mt-2 w-full accent-accent"
+          />
+        </label>
+      )}
+      <button
+        type="button"
+        onClick={() => {
+          onClose()
+          openModal({ kind: 'profile', userId })
+        }}
+        className={`w-full rounded-md px-2 py-1.5 text-left text-sm text-fg hover:bg-hover ${isMe ? '' : 'mt-2'}`}
+      >
+        Profili gör
+      </button>
+    </Floating>
   )
 }

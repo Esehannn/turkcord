@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent } from 'react'
-import { File as FileIcon, Paperclip, Send, Smile, X } from 'lucide-react'
+import { BarChart3, File as FileIcon, Paperclip, Send, Smile, X } from 'lucide-react'
 import { IconButton, Spinner } from '@/components/ui'
 import { useActions } from '@/data/actions'
 import type { ChatMessage } from '@/data/queries'
@@ -9,6 +9,7 @@ import { uploadAttachment } from '@/lib/images'
 import { filterMentions, insertMention, mentionQuery, type MentionCandidate } from '@/lib/mentions'
 import { Avatar } from '@/components/Avatar'
 import { toast } from '@/stores/toast'
+import { useUi } from '@/stores/ui'
 import { EmojiPicker } from './EmojiPicker'
 
 const MAX_LENGTH = 4000
@@ -62,6 +63,7 @@ export function Composer({
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const actions = useActions()
+  const openModal = useUi((s) => s.openModal)
 
   useEffect(() => {
     drafts.set(channelId, text)
@@ -312,11 +314,14 @@ export function Composer({
             onBlur={() => setTimeout(() => setMention(null), 150)}
             onKeyDown={onKeyDown}
             onPaste={onPaste}
-            className="max-h-[40vh] flex-1 resize-none bg-transparent py-3 text-[15px] text-fg outline-none placeholder:text-faint"
+            className="max-h-[40vh] flex-1 resize-none bg-transparent py-3 text-[length:var(--tc-chat-font)] text-fg outline-none placeholder:text-faint"
           />
           {text.length > MAX_LENGTH - 300 && (
             <span className={`mb-3 text-xs ${text.length > MAX_LENGTH ? 'text-accent' : 'text-faint'}`}>{MAX_LENGTH - text.length}</span>
           )}
+          <IconButton label="Anket oluştur" className="mb-1.5" disabled={sending} onClick={() => openModal({ kind: 'create-poll', channelId })}>
+            <BarChart3 className="size-5" />
+          </IconButton>
           <div className="relative mb-1.5">
             <IconButton label="Emoji" onClick={() => setPicker((v) => !v)}>
               <Smile className="size-5" />

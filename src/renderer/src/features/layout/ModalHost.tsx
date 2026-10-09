@@ -1,10 +1,12 @@
 import { useUi } from '@/stores/ui'
+import { CreatePollModal } from '@/features/chat/Poll'
 import { ProfileModal } from '@/features/profile/ProfileModal'
 import { SettingsModal } from '@/features/settings/SettingsModal'
 import { ChannelSettingsModal, CreateChannelModal } from '@/features/servers/ChannelModals'
 import { CreateServerModal } from '@/features/servers/CreateServerModal'
 import { InviteModal } from '@/features/servers/InviteModal'
 import { ServerSettingsModal } from '@/features/servers/ServerSettingsModal'
+import { ForwardModal, QuickSwitcher } from './QuickSwitcher'
 
 export function ModalHost() {
   const modal = useUi((s) => s.modal)
@@ -25,5 +27,11 @@ export function ModalHost() {
       return <SettingsModal initialTab={modal.tab} onClose={close} />
     case 'profile':
       return <ProfileModal userId={modal.userId} onClose={close} />
+    case 'forward':
+      return <ForwardModal message={modal.message} onClose={close} />
+    case 'create-poll':
+      return <CreatePollModal channelId={modal.channelId} onClose={close} />
+    case 'quick-switch':
+      return <QuickSwitcher onClose={close} />
   }
 }

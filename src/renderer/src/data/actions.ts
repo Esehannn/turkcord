@@ -2,9 +2,10 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Attachment, MessageRow, ReactionRow } from '@/lib/database.types'
+import { copyAttachment } from '@/lib/images'
 import { toast } from '@/stores/toast'
 import { useUi } from '@/stores/ui'
-import { addMessage, addReaction, clearUnread, removeMessage, removeReaction, updateMessage } from './cache'
+import { addMessage, addReaction, clearUnread, removeMessage, removeReaction, setVote, updateMessage } from './cache'
 import { keys } from './queries'
 
 // Hata varsa fırlatır; yoksa veriyi döner (dönüş değeri olmayan fonksiyonlarda null gelir).
@@ -174,6 +175,42 @@ export function useActions() {
           ) as MessageRow
           addMessage(qc, row)
           return row
+        }),
+      // İletme: metin aynen gider, ekler hedef kanalın klasörüne kopyalanır.
+      forwardMessage: (message: Pick<MessageRow, 'content' | 'attachments'>, channelId: string, userId: string) =>
+        run(async () => {
+          const attachments: Attachment[] = []
+          for (const attachment of message.attachments) attachments.push(await copyAttachment(attachment, channelId, userId))
+          const row = unwrap(
+            await supabase
+              .from('messages')
+              .insert({ channel_id: channelId, content: message.content, attachments, forwarded: true })
+              .select('*')
+              .single(),
+          ) as MessageRow
+          addMessage(qc, row)
+          return row
+        }, 'Mesaj iletildi.'),
+      setPinned: (message: Pick<MessageRow, 'id' | 'channel_id'>, pinned: boolean) =>
+        run(
+          async () => {
+            unwrap(await supabase.rpc('set_message_pinned', { p_message: message.id, p_pinned: pinned }))
+            await invalidate(keys.pins(message.channel_id))
+          },
+          pinned ? 'Mesaj sabitlendi.' : 'Sabitleme kaldırıldı.',
+        ),
+      createPoll: (channelId: string, question: string, options: string[]) =>
+        run(async () => unwrap(await supabase.rpc('create_poll', { p_channel: channelId, p_question: question, p_options: options }))),
+      // Oy hemen ekranda görünür; sunucu reddederse eski haline döner.
+      votePoll: (messageId: string, userId: string, option: number | null, previous: number | null) =>
+        run(async () => {
+          setVote(qc, { message_id: messageId, user_id: userId, option })
+          try {
+            unwrap(await supabase.rpc('vote_poll', { p_message: messageId, p_option: option }))
+          } catch (error) {
+            setVote(qc, { message_id: messageId, user_id: userId, option: previous })
+            throw error
+          }
         }),
       editMessage: (id: string, content: string) =>
         run(async () => {

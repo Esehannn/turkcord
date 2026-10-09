@@ -1,5 +1,7 @@
-import { Plus } from 'lucide-react'
+import { useState, type MouseEvent } from 'react'
+import { Bell, BellOff, Plus, UserPlus } from 'lucide-react'
 import { Logo } from '@/components/Logo'
+import { ContextMenu } from '@/components/Menu'
 import { useServers, useUnread } from '@/data/queries'
 import { initials } from '@/lib/format'
 import { publicImageUrl } from '@/lib/supabase'
@@ -12,16 +14,21 @@ export function ServerRail() {
   const view = useUi((s) => s.view)
   const setView = useUi((s) => s.setView)
   const openModal = useUi((s) => s.openModal)
+  const muted = useUi((s) => s.muted)
+  const toggleMuted = useUi((s) => s.toggleMuted)
+  const [menu, setMenu] = useState<{ x: number; y: number; serverId: string } | null>(null)
 
   let dmUnread = 0
   const serverState = new Map<string, { unread: boolean; mentions: number }>()
   for (const entry of unread?.values() ?? []) {
+    // Sessize alınanlar okunmamış olarak görünmez; etiketlenmeler yine sayılır.
+    const quiet = muted.includes(entry.channel_id) || (!!entry.server_id && muted.includes(entry.server_id))
     if (!entry.server_id) {
-      dmUnread += entry.unread
+      if (!quiet) dmUnread += entry.unread
       continue
     }
     const s = serverState.get(entry.server_id) ?? { unread: false, mentions: 0 }
-    serverState.set(entry.server_id, { unread: s.unread || entry.unread > 0, mentions: s.mentions + entry.mentions })
+    serverState.set(entry.server_id, { unread: s.unread || (!quiet && entry.unread > 0), mentions: s.mentions + entry.mentions })
   }
 
   return (
@@ -46,6 +53,10 @@ export function ServerRail() {
             unread={state?.unread}
             badge={state?.mentions ?? 0}
             onClick={() => setView({ kind: 'server', serverId: server.id, channelId: rememberedChannel(server.id) })}
+            onContextMenu={(e) => {
+              e.preventDefault()
+              setMenu({ x: e.clientX, y: e.clientY, serverId: server.id })
+            }}
           >
             {icon ? (
               <img src={icon} alt="" className="size-full object-cover" draggable={false} />
@@ -58,6 +69,21 @@ export function ServerRail() {
       <RailItem label="Sunucu oluştur ya da katıl" onClick={() => openModal({ kind: 'create-server' })}>
         <Plus className="size-6" />
       </RailItem>
+      {menu && (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          onClose={() => setMenu(null)}
+          items={[
+            {
+              label: muted.includes(menu.serverId) ? 'Sunucunun sesini aç' : 'Sunucuyu sessize al',
+              icon: muted.includes(menu.serverId) ? Bell : BellOff,
+              onClick: () => toggleMuted(menu.serverId),
+            },
+            { label: 'Arkadaş davet et', icon: UserPlus, onClick: () => openModal({ kind: 'invite', serverId: menu.serverId }) },
+          ]}
+        />
+      )}
     </nav>
   )
 }
@@ -68,6 +94,7 @@ function RailItem({
   unread = false,
   badge = 0,
   onClick,
+  onContextMenu,
   children,
 }: {
   label: string
@@ -75,6 +102,7 @@ function RailItem({
   unread?: boolean
   badge?: number
   onClick: () => void
+  onContextMenu?: (e: MouseEvent) => void
   children: ReactNode
 }) {
   return (
@@ -90,6 +118,7 @@ function RailItem({
         aria-label={label}
         aria-current={active ? 'page' : undefined}
         onClick={onClick}
+        onContextMenu={onContextMenu}
         className={`grid size-12 place-items-center overflow-hidden transition-all ${
           active
             ? 'rounded-2xl bg-rail-active text-rail-active-text'

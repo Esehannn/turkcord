@@ -584,5 +584,160 @@ select tests.login(:'veli');
 set role authenticated;
 select tests.fails(format('select public.start_call(%L)', :'dm_id'), 'engellenen kişi arayamaz', 'turkcord:forbidden');
 
+-- ---------------------------------------------------------------------------
+-- 10. Sabitleme, anket, iletme, görüldü ve sesli kanala giriş bildirimi
+-- ---------------------------------------------------------------------------
+
+-- Engel varken: oy verilemez, anket açılamaz (aşağıda engel kalkınca devam edilir).
+select tests.fails(
+  format('select public.create_poll(%L, %L, %L)', :'dm_id', 'Engelliyken anket?', '{a,b}'),
+  'engellenen kişi anket açamaz', 'turkcord:forbidden');
+
+reset role;
+select tests.login(:'ayse');
+set role authenticated;
+select public.unblock_user(:'veli');
+
+-- Sabitleme
+select public.join_server(:'davet') as ayse_server \gset
+select tests.ok(
+  (select role = 'member' from public.server_members where server_id = :'ayse_server' and user_id = :'ayse'),
+  'ayşe sunucuya sıradan üye olarak katıldı');
+select tests.fails(
+  format('select public.set_message_pinned(%L, true)', :'ali_msg'),
+  'sıradan üye sunucu kanalında mesaj sabitleyemez', 'turkcord:forbidden');
+select tests.fails(
+  format('update public.messages set pinned_at = now() where id = %L', :'ali_msg'),
+  'sabitleme sütunu doğrudan yazılamaz', 'permission denied');
+
+reset role;
+select tests.login(:'veli');
+set role authenticated;
+insert into public.messages (channel_id, content) values (:'dm_id', 'Bunu sabitleyelim') returning id as dm_msg \gset
+select public.set_message_pinned(:'dm_msg', true);
+select tests.ok(
+  (select pinned_at is not null and pinned_by = :'veli' from public.messages where id = :'dm_msg'),
+  'özel mesajda taraflar mesaj sabitleyebilir');
+select tests.fails(
+  format('select public.set_message_pinned(%L, true)', (select id from public.messages where channel_id = :'dm_id' and kind = 'call' limit 1)),
+  'arama kaydı sabitlenemez', 'turkcord:forbidden');
+
+reset role;
+select tests.login(:'ali');
+set role authenticated;
+select public.set_message_pinned(:'ali_msg', true);
+select tests.ok((select pinned_at is not null from public.messages where id = :'ali_msg'), 'sunucu sahibi mesaj sabitleyebilir');
+select public.set_message_pinned(:'ali_msg', false);
+select tests.ok((select pinned_at is null and pinned_by is null from public.messages where id = :'ali_msg'), 'sabitleme kaldırılabilir');
+select tests.fails(
+  format('select public.set_message_pinned(%L, true)', :'dm_msg'),
+  'başkalarının özel mesajı sabitlenemez', 'turkcord:not_found');
+
+-- Anket
+reset role;
+select tests.login(:'veli');
+set role authenticated;
+select tests.fails(
+  format('insert into public.messages (channel_id, content, kind, poll) values (%L, %L, %L, %L)', :'genel_id', 'Sahte anket', 'poll', '{"options":["a","b"]}'),
+  'anket doğrudan mesaj olarak eklenemez', 'permission denied');
+select tests.fails(
+  format('select public.create_poll(%L, %L, %L)', :'genel_id', 'Tek seçenek?', '{yalnız}'),
+  'tek seçenekli anket açılamaz', 'turkcord:invalid_input');
+select tests.fails(
+  format('select public.create_poll(%L, %L, %L)', :'genel_id', '  ', '{a,b}'),
+  'sorusuz anket açılamaz', 'turkcord:invalid_input');
+select tests.fails(
+  format('select public.create_poll(%L, %L, %L)', :'ses_id', 'Ses kanalında anket?', '{a,b}'),
+  'ses kanalında anket açılamaz', 'turkcord:forbidden');
+select public.create_poll(:'genel_id', ' Bu akşam ne oynuyoruz? ', array[' Okey ', '', 'Tavla', 'Batak']) as poll_id \gset
+select tests.ok(
+  (select kind = 'poll' and content = 'Bu akşam ne oynuyoruz?' and poll -> 'options' = '["Okey","Tavla","Batak"]'::jsonb and author_id = :'veli'
+     from public.messages where id = :'poll_id'),
+  'anket temizlenmiş soru ve seçeneklerle oluşturuldu');
+select public.vote_poll(:'poll_id', 1);
+select public.vote_poll(:'poll_id', 2);
+select tests.ok(
+  (select count(*) = 1 and min(option) = 2 from public.poll_votes where message_id = :'poll_id'),
+  'kişi başı tek oy var, oy değiştirilebiliyor');
+select tests.fails(format('select public.vote_poll(%L, 3)', :'poll_id'), 'olmayan seçeneğe oy verilemez', 'turkcord:invalid_input');
+select tests.fails(format('select public.vote_poll(%L, 0)', :'ali_msg'), 'anket olmayan mesaja oy verilemez', 'turkcord:forbidden');
+select tests.fails(
+  format('insert into public.poll_votes (message_id, option) values (%L, 0)', :'poll_id'),
+  'oy tablosuna doğrudan yazılamaz', 'permission denied');
+select tests.fails(
+  format('update public.messages set content = %L where id = %L', 'Değişti', :'poll_id'),
+  'anket sorusu düzenlenemez', 'turkcord:forbidden');
+
+reset role;
+select tests.login(:'ali');
+set role authenticated;
+select tests.ok(
+  (select unread >= 1 from public.unread_counts() where channel_id = :'genel_id'),
+  'anket okunmamış olarak sayılıyor');
+select public.vote_poll(:'poll_id', 0);
+select tests.ok((select count(*) = 2 from public.poll_votes where message_id = :'poll_id'), 'üyeler birbirinin oyunu görüyor');
+select public.vote_poll(:'poll_id', null);
+select tests.ok((select count(*) = 1 from public.poll_votes where message_id = :'poll_id'), 'oy geri alınabiliyor');
+
+reset role;
+select tests.login(:'mehmet');
+set role authenticated;
+select tests.ok((select count(*) = 0 from public.poll_votes), 'üye olmayan oyları göremez');
+select tests.fails(format('select public.vote_poll(%L, 0)', :'poll_id'), 'üye olmayan oy veremez', 'turkcord:forbidden');
+select tests.fails(
+  format('select public.create_poll(%L, %L, %L)', :'genel_id', 'Dışarıdan anket', '{a,b}'),
+  'üye olmayan anket açamaz', 'turkcord:forbidden');
+
+-- İletme
+reset role;
+select tests.login(:'veli');
+set role authenticated;
+insert into public.messages (channel_id, content, forwarded) values (:'dm_id', 'Hoş geldiniz @veli', true) returning id as fwd_msg \gset
+select tests.ok((select forwarded from public.messages where id = :'fwd_msg'), 'iletilen mesaj işaretli olarak eklenebiliyor');
+select tests.fails(
+  format('update public.messages set forwarded = false where id = %L', :'fwd_msg'),
+  'iletildi işareti sonradan değiştirilemez', 'permission denied');
+
+-- Görüldü
+select public.mark_channel_read(:'dm_id');
+select public.mark_channel_read(:'genel_id');
+
+reset role;
+select tests.login(:'ayse');
+set role authenticated;
+select tests.ok(
+  (select count(*) = 1 from public.channel_reads where channel_id = :'dm_id' and user_id = :'veli'),
+  'özel mesajda karşı tarafın okuma kaydı görülüyor');
+select tests.fails(
+  format('update public.channel_reads set last_read_at = now() where channel_id = %L', :'dm_id'),
+  'okuma kaydı doğrudan değiştirilemez', 'permission denied');
+
+reset role;
+select tests.login(:'ali');
+set role authenticated;
+select tests.ok(
+  (select count(*) = 0 from public.channel_reads where user_id = :'veli'),
+  'sunucu kanalındaki ve başkasının özel mesajındaki okuma kayıtları görülmez');
+
+-- Sesli kanala giriş bildirimi
+select public.announce_voice_join(:'ses_id');
+select public.announce_voice_join(:'ses_id');
+select tests.ok((select count(*) = 1 from public.voice_joins where channel_id = :'ses_id'), 'ses kanalına giriş kaydedildi');
+select tests.fails(format('select public.announce_voice_join(%L)', :'genel_id'), 'yazı kanalı için giriş bildirilemez', 'turkcord:forbidden');
+select tests.fails(
+  format('insert into public.voice_joins (channel_id) values (%L)', :'ses_id'),
+  'giriş tablosuna doğrudan yazılamaz', 'permission denied');
+
+reset role;
+select tests.login(:'veli');
+set role authenticated;
+select tests.ok((select count(*) = 1 from public.voice_joins where channel_id = :'ses_id'), 'sunucu üyesi girişi görüyor');
+
+reset role;
+select tests.login(:'mehmet');
+set role authenticated;
+select tests.ok((select count(*) = 0 from public.voice_joins), 'üye olmayan girişleri göremez');
+select tests.fails(format('select public.announce_voice_join(%L)', :'ses_id'), 'üye olmayan giriş bildiremez', 'turkcord:forbidden');
+
 reset role;
 \echo 'Tüm veritabanı testleri geçti.'

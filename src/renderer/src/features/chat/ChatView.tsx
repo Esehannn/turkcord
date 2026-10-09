@@ -1,13 +1,15 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { ArrowDown, AtSign, Hash, Phone, Upload, Users } from 'lucide-react'
+import { ArrowDown, AtSign, Hash, Phone, Pin, Search, Upload, Users } from 'lucide-react'
 import { Avatar, STATUS_LABEL } from '@/components/Avatar'
 import { EmptyState, IconButton, Spinner } from '@/components/ui'
 import { useActions } from '@/data/actions'
+import { trimMessages } from '@/data/cache'
 import {
   keys,
   useBlocks,
   useChannel,
+  useDmRead,
   useDms,
   useMembers,
   useMessages,
@@ -21,8 +23,10 @@ import { CallBar } from '@/features/voice/CallBar'
 import { formatDay, isSameDay, sameGroup } from '@/lib/format'
 import { usePresence } from '@/stores/presence'
 import { useSession } from '@/stores/session'
+import { toast } from '@/stores/toast'
 import { useUi } from '@/stores/ui'
 import { startCall, useCall } from '@/voice/call'
+import { PinsPanel, SearchPanel } from './ChannelPanel'
 import { Composer } from './Composer'
 import { MessageItem } from './MessageItem'
 import { TypingIndicator } from './TypingIndicator'
@@ -30,9 +34,12 @@ import { TypingIndicator } from './TypingIndicator'
 // Bu kadar yukarı kaydırılınca "en yeni mesajlara git" düğmesi belirir.
 const JUMP_AFTER_PX = 400
 
+// Bir mesaja atlarken en fazla bu kadar eski sayfa yüklenir (50'şer mesaj); daha eskisi "çok eski" sayılır.
+const MAX_JUMP_PAGES = 20
+
 // Okunmamış sayılan mesaj mı? (sunucudaki unread_counts ile aynı kural)
 function countsAsUnread(message: ChatMessage, me: string): boolean {
-  return message.author_id !== me && (message.kind === 'text' || message.content === 'missed')
+  return message.author_id !== me && (message.kind !== 'call' || message.content === 'missed')
 }
 
 export function ChatView({ channelId, serverId }: { channelId: string; serverId?: string }) {
@@ -56,6 +63,7 @@ export function ChatView({ channelId, serverId }: { channelId: string; serverId?
   const [editing, setEditing] = useState<string | null>(null)
   const [dragging, setDragging] = useState(false)
   const [dropped, setDropped] = useState<File[] | null>(null)
+  const [panel, setPanel] = useState<'search' | 'pins' | null>(null)
 
   const myProfile = profiles?.get(me)
   const dm = dms?.find((d) => d.channel_id === channelId)
@@ -66,6 +74,9 @@ export function ChatView({ channelId, serverId }: { channelId: string; serverId?
 
   const iBlocked = !!dm && blocks.some((b) => b.blocked_id === dm.user_id)
   const disabledReason = iBlocked ? 'Bu kişiyi engelledin. Mesaj göndermek için önce engeli kaldır.' : null
+  // Özel mesajda iki taraf da, sunucuda sahip ve yöneticiler mesaj sabitleyebilir.
+  const canPin = dm ? !iBlocked : canModerate
+  const { data: dmReadAt } = useDmRead(channelId, dm?.user_id)
 
   // Mesajlar en yeniden eskiye: [0] en yeni.
   const list = useMemo(() => messages.data?.pages.flat() ?? [], [messages.data])
@@ -126,6 +137,55 @@ export function ChatView({ channelId, serverId }: { channelId: string; serverId?
     observer.observe(el)
     return () => observer.disconnect()
   }, [fetchNextPage, hasNextPage, isFetchingNextPage])
+
+  // Kanaldan çıkınca yukarı kaydırırken yüklenen eski sayfalar bellekten atılır.
+  useEffect(() => () => trimMessages(qc, channelId), [qc, channelId])
+
+  // Bir mesaja git: henüz yüklenmediyse eski sayfalar yüklenir, sonra mesaj ortalanıp kısa süre vurgulanır.
+  const pager = useRef({ hasNextPage, fetchNextPage })
+  pager.current = { hasNextPage, fetchNextPage }
+  const jumpTo = useCallback(async (id: string) => {
+    const find = () => document.getElementById(`mesaj-${id}`)
+    let more = pager.current.hasNextPage
+    for (let i = 0; !find() && more && i < MAX_JUMP_PAGES; i++) {
+      more = (await pager.current.fetchNextPage()).hasNextPage
+      await new Promise((resolve) => requestAnimationFrame(resolve))
+    }
+    const el = find()
+    if (!el) {
+      toast.info('Mesaj bulunamadı; silinmiş ya da çok eski olabilir.')
+      return
+    }
+    el.scrollIntoView({ block: 'center' })
+    el.classList.remove('anim-flash')
+    // Animasyonu baştan başlatmak için yeniden çizim beklenir.
+    void el.offsetWidth
+    el.classList.add('anim-flash')
+  }, [])
+
+  // Başka bir yerden gelen "şu mesaja git" isteği.
+  const jump = useUi((s) => s.jump)
+  useEffect(() => {
+    if (!jump || jump.channelId !== channelId || messages.isLoading) return
+    useUi.getState().setJump(null)
+    void jumpTo(jump.messageId)
+  }, [channelId, jump, jumpTo, messages.isLoading])
+
+  // Ctrl+F: bu sohbette ara.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+        e.preventDefault()
+        setPanel('search')
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  // "Görüldü": özel mesajda en son mesaj benimse ve karşı taraf ondan sonra okuduysa.
+  const last = list[0]
+  const seenId = dm && last && last.author_id === me && last.kind !== 'call' && dmReadAt && dmReadAt >= last.created_at ? last.id : null
 
   // Yukarıdayken "en alta in" düğmesi ve o sırada gelen mesajların sayısı.
   // Liste column-reverse olduğu için en altta scrollTop 0'dır, yukarı çıktıkça eksiye gider.
@@ -223,6 +283,12 @@ export function ChatView({ channelId, serverId }: { channelId: string; serverId?
           </>
         )}
         <div className="flex-1" />
+        <IconButton label="Bu sohbette ara (Ctrl+F)" onClick={() => setPanel(panel === 'search' ? null : 'search')}>
+          <Search className={`size-5 ${panel === 'search' ? 'text-fg' : ''}`} />
+        </IconButton>
+        <IconButton label="Sabitlenmiş mesajlar" onClick={() => setPanel(panel === 'pins' ? null : 'pins')}>
+          <Pin className={`size-5 ${panel === 'pins' ? 'text-fg' : ''}`} />
+        </IconButton>
         {dm && !iBlocked && (
           <IconButton label={call ? 'Zaten bir aramadasın' : `${dm.display_name} kişisini ara`} disabled={!!call} onClick={callPeer}>
             <Phone className="size-5" />
@@ -246,7 +312,7 @@ export function ChatView({ channelId, serverId }: { channelId: string; serverId?
             <>
               {list.map((message, i) => {
                 const older = list[i + 1]
-                const grouped = sameGroup(older, message) && older?.kind === 'text' && dividerId !== message.id
+                const grouped = sameGroup(older, message) && older?.kind === 'text' && message.kind !== 'poll' && dividerId !== message.id
                 const replied = message.reply_to ? byId.get(message.reply_to) : undefined
                 return (
                   <Fragment key={message.id}>
@@ -265,6 +331,9 @@ export function ChatView({ channelId, serverId }: { channelId: string; serverId?
                       profileName={profileName}
                       nameColor={message.author_id ? nameColors.get(message.author_id) : undefined}
                       onCallBack={dm && !iBlocked && !call ? callPeer : undefined}
+                      canPin={canPin}
+                      seen={seenId === message.id}
+                      onJumpTo={jumpTo}
                     />
                     {dividerId === message.id && <NewDivider />}
                     {(!older || !isSameDay(older.created_at, message.created_at)) && <DayDivider iso={message.created_at} />}
@@ -281,6 +350,9 @@ export function ChatView({ channelId, serverId }: { channelId: string; serverId?
             </>
           )}
         </div>
+
+        {panel === 'search' && <SearchPanel channelId={channelId} onJump={(m) => void jumpTo(m.id)} onClose={() => setPanel(null)} />}
+        {panel === 'pins' && <PinsPanel channelId={channelId} canPin={canPin} onJump={(m) => void jumpTo(m.id)} onClose={() => setPanel(null)} />}
 
         {away && (
           <button
@@ -328,7 +400,7 @@ export function ChatView({ channelId, serverId }: { channelId: string; serverId?
 
 function DayDivider({ iso }: { iso: string }) {
   return (
-    <div className="mx-4 mt-5 mb-1 flex items-center gap-3 text-xs font-semibold text-faint">
+    <div className="mx-4 mt-5 mb-1 flex items-center gap-3 text-xs font-semibold text-faint compact:mt-3">
       <div className="h-px flex-1 bg-line" />
       {formatDay(iso)}
       <div className="h-px flex-1 bg-line" />

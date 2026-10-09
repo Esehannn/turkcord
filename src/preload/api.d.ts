@@ -24,8 +24,8 @@ export interface TurkcordApi {
   setShortcuts: (shortcuts: { mute: string | null; deafen: string | null }) => Promise<{ mute: boolean; deafen: boolean } | null>
   onShortcut: (callback: (command: 'mute' | 'deafen') => void) => () => void
   reportVoiceStatus: (status: { inVoice: boolean; muted: boolean; deafened: boolean }) => void
-  // Başlık çubuğundaki Windows düğmelerinin rengi temaya uyar.
-  setTheme: (theme: 'light' | 'dark') => void
+  // Başlık çubuğundaki Windows düğmelerinin rengi temaya ve vurgu rengine uyar.
+  setTheme: (theme: 'light' | 'dark', accent?: string) => void
   // Gelen arama: pencere tepsideyse odağı çalmadan gösterir, görev çubuğunda yanıp söner.
   requestAttention: () => void
   // Bildirime tıklanınca pencereyi öne getirir.

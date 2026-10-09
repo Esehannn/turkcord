@@ -456,6 +456,9 @@ export async function joinVoice(serverId: string | null, channelId: string, user
         publishState()
         setState({ status: 'connected' })
         voiceSounds.join()
+        // Sunucudaki arkadaşlara "ses kanalına girdi" bildirimi gider (bireysel aramada gerekmez).
+        // (İstek ancak beklenince gönderilir; sonucu önemli değil.)
+        if (!dmRoom) void supabase.rpc('announce_voice_join', { p_channel: channelId }).then(() => undefined)
       }
       if ((status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') && token === joinToken) {
         toast.error('Ses kanalına bağlanılamadı. İnternet bağlantını kontrol et.')

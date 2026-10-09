@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { ChevronDown, Hash, LogOut, Plus, Settings, Trash2, UserPlus, Volume2 } from 'lucide-react'
+import { Bell, BellOff, ChevronDown, Hash, LogOut, Plus, Settings, Trash2, UserPlus, Volume2 } from 'lucide-react'
+import { ContextMenu } from '@/components/Menu'
 import { confirmDialog } from '@/components/Modal'
 import { Badge, IconButton } from '@/components/ui'
 import { useActions } from '@/data/actions'
@@ -26,6 +27,9 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
   const openModal = useUi((s) => s.openModal)
   const actions = useActions()
   const [menuOpen, setMenuOpen] = useState(false)
+  const muted = useUi((s) => s.muted)
+  const toggleMuted = useUi((s) => s.toggleMuted)
+  const serverMuted = muted.includes(serverId)
   const voiceChannel = useVoice((s) => (s.status !== 'idle' ? s.channelId : null))
 
   const role = members.find((m) => m.user_id === me)?.role ?? 'member'
@@ -53,6 +57,7 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
     { label: 'Arkadaş davet et', icon: UserPlus, onClick: () => openModal({ kind: 'invite', serverId }), show: true },
     { label: 'Kanal oluştur', icon: Plus, onClick: () => openModal({ kind: 'create-channel', serverId }), show: canManage },
     { label: 'Sunucu ayarları', icon: Settings, onClick: () => openModal({ kind: 'server-settings', serverId }), show: canManage },
+    { label: serverMuted ? 'Sunucunun sesini aç' : 'Sunucuyu sessize al', icon: serverMuted ? Bell : BellOff, onClick: () => toggleMuted(serverId), show: true },
     {
       label: 'Sunucudan ayrıl',
       icon: LogOut,
@@ -93,6 +98,7 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
             {server.icon_path ? <img src={publicImageUrl(server.icon_path) ?? ''} alt="" className="size-full object-cover" /> : initials(server.name)}
           </span>
           <span className="flex-1 truncate">{server.name}</span>
+          {serverMuted && <BellOff className="size-3.5 shrink-0 text-faint" aria-label="Sessize alındı" />}
           <ChevronDown className={`size-4 transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
         </button>
         {menuOpen && (
@@ -134,6 +140,8 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
                 unread={!!entry?.unread}
                 mentions={entry?.mentions ?? 0}
                 canManage={canManage}
+                muted={serverMuted || muted.includes(c.id)}
+                onToggleMuted={() => toggleMuted(c.id)}
                 onClick={() => setView({ kind: 'server', serverId, channelId: c.id })}
                 onSettings={() => openModal({ kind: 'channel-settings', channelId: c.id })}
               />
@@ -149,6 +157,8 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
                 unread={false}
                 mentions={0}
                 canManage={canManage}
+                muted={serverMuted || muted.includes(c.id)}
+                onToggleMuted={() => toggleMuted(c.id)}
                 onClick={() => me && void joinVoice(serverId, c.id, me)}
                 onSettings={() => openModal({ kind: 'channel-settings', channelId: c.id })}
               />
@@ -183,6 +193,8 @@ function ChannelButton({
   unread,
   mentions,
   canManage,
+  muted,
+  onToggleMuted,
   onClick,
   onSettings,
 }: {
@@ -191,16 +203,36 @@ function ChannelButton({
   unread: boolean
   mentions: number
   canManage: boolean
+  // Sessize alınmış: bildirim gelmez, okunmamış işareti gösterilmez (etiketlenmeler yine sayılır).
+  muted: boolean
+  onToggleMuted: () => void
   onClick: () => void
   onSettings: () => void
 }) {
   const Icon = channel.kind === 'voice' ? Volume2 : Hash
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
+  if (muted) unread = mentions > 0
   return (
     <div
+      onContextMenu={(e) => {
+        e.preventDefault()
+        setMenu({ x: e.clientX, y: e.clientY })
+      }}
       className={`group relative flex items-center rounded-md transition-colors ${
-        active ? 'bg-selected text-fg' : unread ? 'text-fg hover:bg-hover' : 'text-muted hover:bg-hover hover:text-fg'
+        active ? 'bg-selected text-fg' : unread ? 'text-fg hover:bg-hover' : `${muted ? 'text-faint' : 'text-muted'} hover:bg-hover hover:text-fg`
       }`}
     >
+      {menu && (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          onClose={() => setMenu(null)}
+          items={[
+            { label: muted ? 'Sesini aç' : 'Sessize al', icon: muted ? Bell : BellOff, onClick: onToggleMuted },
+            { label: 'Kanal ayarları', icon: Settings, show: canManage, onClick: onSettings },
+          ]}
+        />
+      )}
       {unread && !active && (
         <span className={`absolute -left-2 w-1 rounded-r-full ${mentions > 0 ? 'anim-attention h-5 bg-accent' : 'h-2 bg-fg'}`} />
       )}
@@ -208,6 +240,7 @@ function ChannelButton({
         <Icon className="size-[18px] shrink-0 opacity-70" />
         <span className={`truncate text-[15px] ${unread ? 'font-semibold' : 'font-medium'}`}>{channel.name}</span>
       </button>
+      {muted && <BellOff className="mr-1.5 size-3.5 shrink-0 opacity-60 group-hover:hidden" aria-label="Sessize alındı" />}
       <Badge count={mentions} className="mr-1" />
       {canManage && (
         <IconButton label="Kanal ayarları" className="mr-1 size-6 opacity-0 group-hover:opacity-100" onClick={onSettings}>
