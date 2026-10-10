@@ -1,8 +1,16 @@
 import { create } from 'zustand'
 import type { MessageRow } from '@/lib/database.types'
+import { muteDeadline, type MuteSpan } from '@/lib/format'
 import type { Ringtone } from '@/lib/sounds'
 
 export type Theme = 'light' | 'dark'
+// Koyu temanın tonu: klasik (gri), gece (lacivertimsi), siyah (tam siyah).
+export const DARK_TONES = [
+  { id: 'klasik', label: 'Koyu', rail: '#121214', sidebar: '#1b1b1f', chat: '#232328' },
+  { id: 'gece', label: 'Gece', rail: '#0c1120', sidebar: '#131a2b', chat: '#192135' },
+  { id: 'siyah', label: 'Tam siyah', rail: '#000000', sidebar: '#0b0b0c', chat: '#000000' },
+] as const
+export type DarkTone = (typeof DARK_TONES)[number]['id']
 export type ChatFont = 'small' | 'normal' | 'large'
 
 // Vurgu rengi: düğmeler, seçili öğeler ve (açık temada) sol şerit ile başlık çubuğu bu renkte olur.
@@ -21,7 +29,8 @@ export type FriendsTab = 'online' | 'all' | 'pending' | 'blocked' | 'add'
 export type View =
   | { kind: 'home'; tab: FriendsTab }
   | { kind: 'dm'; channelId: string }
-  | { kind: 'server'; serverId: string; channelId: string | null }
+  // voiceId: ortada sohbet yerine bu ses kanalının odası gösterilir.
+  | { kind: 'server'; serverId: string; channelId: string | null; voiceId?: string | null }
 
 export type Modal =
   | { kind: 'create-server' }
@@ -41,6 +50,7 @@ export type Jump = { channelId: string; messageId: string; createdAt: string }
 
 type Prefs = {
   theme: Theme
+  darkTone: DarkTone
   status: PresenceStatus
   notifications: boolean
   sounds: boolean
@@ -61,6 +71,8 @@ type Prefs = {
   compact: boolean
   // Sessize alınan kanal, özel mesaj ve sunucuların kimlikleri.
   muted: string[]
+  // Süreli sessize alınanların biteceği an (ms). Burada kaydı olmayan sessize alma süresizdir.
+  mutedUntil: Record<string, number>
   // Bir arkadaş ses kanalına girince bildir.
   voiceJoins: boolean
 }
@@ -87,6 +99,7 @@ function writeJson(key: string, value: unknown): void {
 
 const defaultPrefs: Prefs = {
   theme: 'light',
+  darkTone: 'klasik',
   status: 'online',
   notifications: true,
   sounds: true,
@@ -100,6 +113,7 @@ const defaultPrefs: Prefs = {
   chatFont: 'normal',
   compact: false,
   muted: [],
+  mutedUntil: {},
   voiceJoins: true,
 }
 const PREF_KEYS = Object.keys(defaultPrefs) as (keyof Prefs)[]
@@ -109,7 +123,8 @@ type UiState = Prefs & {
   modal: Modal
   jump: Jump | null
   setJump: (jump: Jump | null) => void
-  toggleMuted: (id: string) => void
+  mute: (id: string, span: MuteSpan) => void
+  unmute: (id: string) => void
   setView: (view: View) => void
   openModal: (modal: Modal) => void
   closeModal: () => void
@@ -122,9 +137,20 @@ export const useUi = create<UiState>((set, get) => ({
   modal: null,
   jump: null,
   setJump: (jump) => set({ jump }),
-  toggleMuted: (id) => {
-    const muted = get().muted
-    get().setPrefs({ muted: muted.includes(id) ? muted.filter((m) => m !== id) : [...muted, id] })
+  mute: (id, span) => {
+    const { muted, mutedUntil } = get()
+    const until = { ...mutedUntil }
+    const deadline = muteDeadline(span)
+    if (deadline) until[id] = deadline
+    else delete until[id]
+    get().setPrefs({ muted: muted.includes(id) ? muted : [...muted, id], mutedUntil: until })
+    scheduleMuteExpiry()
+  },
+  unmute: (id) => {
+    const { muted, mutedUntil } = get()
+    const until = { ...mutedUntil }
+    delete until[id]
+    get().setPrefs({ muted: muted.filter((m) => m !== id), mutedUntil: until })
   },
   setView: (view) => {
     set({ view })
@@ -136,9 +162,27 @@ export const useUi = create<UiState>((set, get) => ({
     set(prefs)
     const state = get()
     writeJson(PREFS_KEY, Object.fromEntries(PREF_KEYS.map((key) => [key, state[key]])))
-    if (prefs.theme || prefs.accent || prefs.chatFont || prefs.compact !== undefined) applyAppearance()
+    if (prefs.theme || prefs.darkTone || prefs.accent || prefs.chatFont || prefs.compact !== undefined) applyAppearance()
   },
 }))
+
+// Süresi dolan sessize almaları kaldırır ve bir sonraki bitiş anı için tek bir zamanlayıcı kurar.
+let muteTimer: ReturnType<typeof setTimeout> | undefined
+export function scheduleMuteExpiry(): void {
+  clearTimeout(muteTimer)
+  const { muted, mutedUntil, setPrefs } = useUi.getState()
+  const now = Date.now()
+  const expired = Object.keys(mutedUntil).filter((id) => mutedUntil[id] <= now)
+  if (expired.length) {
+    setPrefs({
+      muted: muted.filter((id) => !expired.includes(id)),
+      mutedUntil: Object.fromEntries(Object.entries(mutedUntil).filter(([id]) => !expired.includes(id))),
+    })
+  }
+  const next = Math.min(...Object.values(useUi.getState().mutedUntil))
+  // setTimeout en fazla ~24 gün bekleyebilir; daha uzun süreler yeniden kurulur.
+  if (Number.isFinite(next)) muteTimer = setTimeout(scheduleMuteExpiry, Math.min(next - now + 500, 2 ** 31 - 1))
+}
 
 // Bu kanal (ya da bulunduğu sunucu) sessize alınmış mı?
 export function isMuted(muted: string[], channelId: string, serverId?: string | null): boolean {
@@ -147,11 +191,14 @@ export function isMuted(muted: string[], channelId: string, serverId?: string | 
 
 // Tema, vurgu rengi ve yazı boyutunu sayfaya (ve başlık çubuğundaki Windows düğmelerine) uygular.
 export function applyAppearance(): void {
-  const { theme, accent, chatFont, compact } = useUi.getState()
+  const { theme, darkTone, accent, chatFont, compact } = useUi.getState()
   const root = document.documentElement
   root.dataset.theme = theme
+  root.dataset.tone = darkTone
   root.dataset.accent = accent
   root.dataset.chatFont = chatFont
   root.dataset.density = compact ? 'compact' : 'normal'
-  window.turkcord?.setTheme?.(theme, ACCENTS.find((a) => a.id === accent)?.color)
+  // Başlık çubuğundaki Windows düğmelerinin zemini: açık temada vurgu rengi, koyu temada sol şeridin rengi.
+  const bar = theme === 'dark' ? DARK_TONES.find((t) => t.id === darkTone)?.rail : ACCENTS.find((a) => a.id === accent)?.color
+  window.turkcord?.setTheme?.(theme, bar)
 }

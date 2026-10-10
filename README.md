@@ -38,15 +38,17 @@ Sunucu tarafında [Supabase](https://supabase.com) kullanır ve ücretsiz planla
 | ✅ | Dosya gönderme: görsel, ses, video ve her tür dosya (25 MB'a kadar), sürükle-bırak, yükleme ilerlemesi |
 | ✅ | Biçimlendirme (**kalın**, *italik*, `kod`, spoiler), otomatik tamamlamalı @etiketleme, "yazıyor…" göstergesi |
 | ✅ | Sohbette arama (Ctrl+F), sabitlenmiş mesajlar, anket, mesaj iletme, özel mesajda "Görüldü" |
-| ✅ | Hızlı geçiş (Ctrl+K), kanal / sunucu / özel mesaj sessize alma, sesli kanala giriş bildirimi |
+| ✅ | Hızlı geçiş (Ctrl+K), kanal / sunucu / özel mesaj sessize alma (süreli ya da süresiz), sesli kanala giriş bildirimi |
 | ✅ | Bildirimler: ayarlanabilir sesler, uygulama içi bildirim kartları, masaüstü bildirimleri, okunmamış rozetleri |
-| ✅ | "Yeni mesajlar" çizgisi, en alta in düğmesi, açık ve koyu tema, altı vurgu rengi, yazı boyutu, sıkışık görünüm, kendi başlık çubuğu |
+| ✅ | "Yeni mesajlar" çizgisi, en alta in düğmesi, açık tema ve üç koyu ton (koyu, gece, tam siyah), altı vurgu rengi, yazı boyutu, sıkışık görünüm, kendi başlık çubuğu |
 | ✅ | Yönetici paneli: davet kodları, şifre sıfırlama, hesap askıya alma, depolama kullanımı ve temizlik |
+| ✅ | Ses odası: kanaldakiler büyük kartlarla, konuşan çerçevesi, ping ve seste geçen süre |
 | ✅ | Sesli sohbet: P2P WebRTC, konuşan göstergesi, ping göstergesi, susturma/sağırlaştırma, kişi başı ses ayarı, cihaz seçimi |
 | ✅ | Bireysel sesli arama: özel mesajdan arama, mehter arama melodisi (ya da kendi ses dosyan), cevapsız arama kaydı |
 | ✅ | Ses efektleri: ses kanalında ya da aramada herkese çalan korna, alkış, ba-dum-tıss… |
 | ✅ | Yapay zekâ gürültü engelleme (RNNoise), giriş hassasiyeti, yankı engelleme, bas-konuş |
-| ✅ | Otomatik güncelleme (yeni sürüm arka planda iner, tek tıkla kurulur) |
+| ✅ | Mehter temalı sesler: bildirimler, arama melodisi ve ses kanalı işaretleri "Ceddin Deden"in notalarından sentezlenir |
+| ✅ | Otomatik güncelleme: açılışta küçük bir pencere yeni sürümü denetler, varsa uygulama açılmadan kurar; çalışırken arka planda iner |
 | ✅ | Sistem tepsisi, Windows açılışında başlatma, oyundayken de çalışan mikrofon/sağırlaştırma kısayolları |
 
 ## Arkadaşlar için kurulum

@@ -1,29 +1,15 @@
-import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import './index.css'
-import { App } from './App'
-import { handleAuthError } from './lib/authGuard'
 import { applyAppearance } from './stores/ui'
-
-const queryClient = new QueryClient({
-  // Oturum geçersizse (401) yenilemeyi dener, olmazsa giriş ekranına döner.
-  queryCache: new QueryCache({ onError: (error) => void handleAuthError(error) }),
-  defaultOptions: {
-    queries: {
-      staleTime: 60_000,
-      refetchOnWindowFocus: false,
-      retry: 1,
-    },
-  },
-})
 
 applyAppearance()
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <App />
-    </QueryClientProvider>
-  </StrictMode>,
-)
+const root = createRoot(document.getElementById('root')!)
+
+// Açılıştaki küçük güncelleme penceresi aynı sayfayı "#guncelleme" ile açar. O pencerede uygulamanın kendisi
+// (oturum, sunucu bağlantısı, sohbetler) yüklenmez; yalnızca güncelleme ekranı çizilir.
+if (location.hash === '#guncelleme') {
+  void import('./features/update/UpdateScreen').then(({ UpdateScreen }) => root.render(<UpdateScreen />))
+} else {
+  void import('./boot').then(({ Boot }) => root.render(<Boot />))
+}

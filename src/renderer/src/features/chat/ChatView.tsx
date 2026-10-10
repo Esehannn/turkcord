@@ -361,7 +361,7 @@ export function ChatView({ channelId, serverId }: { channelId: string; serverId?
             className={`anim-pop absolute right-5 bottom-3 z-10 flex h-9 items-center gap-2 rounded-full border px-3 text-sm font-semibold shadow-pop transition-colors ${
               missed > 0 ? 'border-accent bg-accent text-on-accent hover:bg-accent-hover' : 'border-line bg-elevated text-fg hover:bg-hover'
             }`}
-            title="En yeni mesajlara git"
+            data-tip="En yeni mesajlara git"
           >
             {missed > 0 && <span>{missed > 99 ? '99+' : missed} yeni mesaj</span>}
             <ArrowDown className="size-4" />

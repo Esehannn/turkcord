@@ -29,7 +29,13 @@
   özel mesajda "Görüldü", kanal/sunucu/sohbet sessize alma, sesli kanala giriş bildirimi, vurgu rengi, yazı boyutu ve
   sıkışık görünüm, ayarlarda sürüm numarası
 
+- [x] **8. Ses teması ve cilalama (0.6.1)**: mehter temalı ses paketi (bildirimler, arama melodisi ve ses kanalı işaretleri
+  "Ceddin Deden"in notalarından), ses odası görünümü ve seste geçen süre, süreli sessize alma, açılışta ayrı güncelleme
+  penceresi, uygulamanın kendi ipuçları, koyu temaya "gece" ve "tam siyah" tonları, yeni profil kartı
+
 ## Sıradaki fikirler
+
+- Ekran paylaşımı (0.7.0'ın ana konusu): ses bağlantısına eklenen görüntü; varsayılan 720p / 30 kare
 
 - Sunucuya özel, yüklenebilen ses efektleri (şu an efektler uygulamayla gelen sabit bir set)
 - Grup aramaları (şu an arama iki kişi arasında; kalabalık için ses kanalları var)
@@ -45,4 +51,4 @@
 
 ## Bilinçli olarak dışarıda bırakılanlar
 
-Ekran paylaşımı, kamera, mobil uygulama, GIF arama (API anahtarı ister), bağlantı önizleme (ek sunucu ister).
+Kamera, mobil uygulama, GIF arama (API anahtarı ister), bağlantı önizleme (ek sunucu ister).

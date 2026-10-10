@@ -1,11 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import type { LucideIcon } from 'lucide-react'
+import { ChevronLeft, ChevronRight, type LucideIcon } from 'lucide-react'
 
 // Menüler ve küçük açılır kutular. Hepsi sayfanın en üstüne (body) çizilir; böylece içinde durdukları
 // kaydırılabilir listenin sınırına takılıp kesilmezler.
 
-export type MenuItem = { label: string; icon: LucideIcon; show?: boolean; danger?: boolean; onClick: () => void }
+// items verilirse tıklayınca alt menü açılır (ör. "Sessize al" → süre seçenekleri).
+export type MenuItem = { label: string; icon: LucideIcon; show?: boolean; danger?: boolean; onClick?: () => void; items?: MenuItem[] }
 
 const EDGE = 8
 // Başlık çubuğunun altında kalsın.
@@ -26,20 +27,43 @@ function useDismiss(onClose: () => void): void {
 }
 
 // Verilen noktada açılır; pencerenin dışına taşacaksa içeri kaydırılır.
-export function Floating({ x, y, onClose, className = '', children }: { x: number; y: number; onClose: () => void; className?: string; children: ReactNode }) {
+// above: kutu noktanın üstüne açılır (alt kenarı y'ye gelir); üstte yer yoksa flipY verilmişse oradan aşağı açılır.
+// align 'end': sağ kenarı x'e gelir.
+export function Floating({
+  x,
+  y,
+  onClose,
+  above = false,
+  flipY,
+  align = 'start',
+  className = '',
+  children,
+}: {
+  x: number
+  y: number
+  onClose: () => void
+  above?: boolean
+  flipY?: number
+  align?: 'start' | 'end'
+  className?: string
+  children: ReactNode
+}) {
   const ref = useRef<HTMLDivElement>(null)
-  const [pos, setPos] = useState({ left: x, top: y })
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null)
   useDismiss(onClose)
 
   useLayoutEffect(() => {
     const el = ref.current
     if (!el) return
     const { width, height } = el.getBoundingClientRect()
+    const left = align === 'end' ? x - width : x
+    let top = above ? y - height : y
+    if (above && top < TOP_EDGE && flipY !== undefined) top = flipY
     setPos({
-      left: Math.max(EDGE, Math.min(x, window.innerWidth - width - EDGE)),
-      top: Math.max(TOP_EDGE, Math.min(y, window.innerHeight - height - EDGE)),
+      left: Math.max(EDGE, Math.min(left, window.innerWidth - width - EDGE)),
+      top: Math.max(TOP_EDGE, Math.min(top, window.innerHeight - height - EDGE)),
     })
-  }, [x, y])
+  }, [x, y, above, flipY, align, children])
 
   return createPortal(
     <>
@@ -58,7 +82,8 @@ export function Floating({ x, y, onClose, className = '', children }: { x: numbe
       />
       <div
         ref={ref}
-        style={pos}
+        // Yeri ölçülene kadar görünmez; yanlış yerde bir an belirip zıplamaz.
+        style={pos ?? { left: 0, top: 0, visibility: 'hidden' }}
         onClick={(e) => e.stopPropagation()}
         onContextMenu={(e) => e.stopPropagation()}
         className={`anim-pop fixed z-50 rounded-lg border border-line bg-elevated shadow-pop ${className}`}
@@ -72,26 +97,39 @@ export function Floating({ x, y, onClose, className = '', children }: { x: numbe
 
 // Sağ tık menüsü.
 export function ContextMenu({ x, y, items, onClose }: { x: number; y: number; items: MenuItem[]; onClose: () => void }) {
-  const visible = items.filter((item) => item.show !== false)
+  // Açık alt menü (varsa); menünün içeriği onunla değişir.
+  const [sub, setSub] = useState<MenuItem | null>(null)
+  const visible = (sub?.items ?? items).filter((item) => item.show !== false)
   if (visible.length === 0) return null
   return (
-    <Floating x={x} y={y} onClose={onClose} className="w-52 p-1.5">
+    <Floating x={x} y={y} onClose={onClose} className="w-56 p-1.5">
       <div role="menu">
+        {sub && (
+          <button
+            type="button"
+            onClick={() => setSub(null)}
+            className="mb-1 flex w-full items-center gap-1.5 rounded-md border-b border-line px-1.5 pt-1 pb-2 text-xs font-bold tracking-wide text-faint uppercase hover:text-fg"
+          >
+            <ChevronLeft className="size-3.5" />
+            {sub.label}
+          </button>
+        )}
         {visible.map((item) => (
           <button
             key={item.label}
             type="button"
             role="menuitem"
             onClick={() => {
+              if (item.items) return setSub(item)
               onClose()
-              item.onClick()
+              item.onClick?.()
             }}
             className={`flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-sm font-medium hover:bg-hover ${
               item.danger ? 'text-accent' : 'text-fg'
             }`}
           >
             {item.label}
-            <item.icon className="size-4" />
+            {item.items ? <ChevronRight className="size-4 text-faint" /> : <item.icon className="size-4" />}
           </button>
         ))}
       </div>

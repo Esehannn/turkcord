@@ -108,7 +108,7 @@ function GeneralTab({ serverId }: { serverId: string }) {
           type="button"
           onClick={() => fileRef.current?.click()}
           className="group relative grid size-24 shrink-0 place-items-center overflow-hidden rounded-3xl bg-accent text-2xl font-bold text-white"
-          title="Fotoğrafı değiştir"
+          data-tip="Fotoğrafı değiştir"
         >
           {icon ? <img src={icon} alt="" className="size-full object-cover" /> : initials(server.name)}
           <span className="absolute inset-0 grid place-items-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
@@ -167,7 +167,7 @@ function ColorPicker({ value, onChange }: { value: string; onChange: (color: str
           style={{ backgroundColor: c }}
         />
       ))}
-      <label className="relative size-6 cursor-pointer overflow-hidden rounded-full border border-line" title="Başka renk">
+      <label className="relative size-6 cursor-pointer overflow-hidden rounded-full border border-line" data-tip="Başka renk">
         <input type="color" value={value} onChange={(e) => onChange(e.target.value)} className="absolute -inset-2 size-10 cursor-pointer" />
       </label>
     </div>
@@ -342,7 +342,7 @@ function MembersTab({ serverId, me, myRole }: { serverId: string; me: string; my
                 <Button
                   variant="secondary"
                   className="h-8 px-3 text-xs"
-                  title="Yönetici; kanal açıp düzenleyebilir, üye atabilir, mesaj silebilir, rol verebilir."
+                  data-tip="Yönetici; kanal açıp düzenleyebilir, üye atabilir, mesaj silebilir, rol verebilir."
                   onClick={() => void actions.setMemberRole(serverId, m.user_id, m.role === 'admin' ? 'member' : 'admin')}
                 >
                   {m.role === 'admin' ? 'Yöneticiliği al' : 'Yönetici yap'}

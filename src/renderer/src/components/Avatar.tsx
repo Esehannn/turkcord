@@ -5,7 +5,7 @@ import { useStatus } from '@/stores/presence'
 // İsimden sabit bir renk seçilir; avatarı olmayanlar ayırt edilebilsin.
 const COLORS = ['#e30a17', '#b3121d', '#d9480f', '#2b8a3e', '#1971c2', '#6741d9', '#c2255c', '#0c8599', '#5c940d']
 
-function colorFor(seed: string): string {
+export function colorFor(seed: string): string {
   let hash = 0
   for (const ch of seed) hash = (hash * 31 + ch.charCodeAt(0)) | 0
   return COLORS[Math.abs(hash) % COLORS.length]
@@ -52,7 +52,7 @@ export function Avatar({ name, path, size = 40, userId, showStatus = false, ring
       )}
       {showStatus && (
         <span
-          title={STATUS_LABEL[status]}
+          data-tip={STATUS_LABEL[status]}
           className={`absolute right-0 bottom-0 rounded-full ring-[3px] ${ringClass} ${STATUS_COLOR[status]}`}
           style={{ width: dot, height: dot }}
         />

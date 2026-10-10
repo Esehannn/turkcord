@@ -1,5 +1,5 @@
 import { Ban, MessageCircle, Phone, UserCheck, UserPlus } from 'lucide-react'
-import { Avatar, STATUS_LABEL } from '@/components/Avatar'
+import { Avatar, colorFor, STATUS_LABEL, StatusDot } from '@/components/Avatar'
 import { confirmDialog, Modal } from '@/components/Modal'
 import { Button } from '@/components/ui'
 import { useActions } from '@/data/actions'
@@ -23,19 +23,33 @@ export function ProfileModal({ userId, onClose }: { userId: string; onClose: () 
   const isMe = userId === me
   const friendship = friendships.find((f) => f.requester_id === userId || f.addressee_id === userId)
   const blocked = blocks.some((b) => b.blocked_id === userId)
+  const banner = colorFor(profile.display_name)
 
   return (
-    <Modal title="" onClose={onClose} width="max-w-sm">
-      <div className="-mt-4 flex flex-col items-center text-center">
-        <Avatar name={profile.display_name} path={profile.avatar_path} userId={userId} size={88} showStatus ringClass="ring-elevated" />
-        <h2 className="mt-3 text-xl font-bold text-fg">{profile.display_name}</h2>
-        <p className="text-sm text-muted">@{profile.username}</p>
-        <p className="mt-1 text-sm text-muted">{profile.custom_status || STATUS_LABEL[status]}</p>
-        <p className="mt-3 text-xs text-faint">Üyelik: {formatDay(profile.created_at)}</p>
+    <Modal title="" onClose={onClose} width="max-w-sm" bare>
+      {/* Üst şerit kişinin avatar renginden türer; avatar şeridin üstüne biner. */}
+      <div className="h-24" style={{ background: `linear-gradient(135deg, ${banner}, color-mix(in srgb, ${banner} 55%, black))` }} />
+      <div className="px-5 pb-5">
+        <div className="-mt-11 flex rounded-full">
+          <span className="flex rounded-full ring-[5px] ring-elevated">
+            <Avatar name={profile.display_name} path={profile.avatar_path} userId={userId} size={88} showStatus ringClass="ring-elevated" />
+          </span>
+        </div>
+        <h2 className="selectable mt-3 text-xl leading-tight font-bold text-fg">{profile.display_name}</h2>
+        <p className="selectable text-sm text-muted">@{profile.username}</p>
+
+        <div className="mt-4 space-y-2.5 rounded-lg border border-line bg-sidebar p-3 text-sm">
+          <p className="flex items-center gap-2 text-fg">
+            <StatusDot status={status} />
+            {STATUS_LABEL[status]}
+          </p>
+          {profile.custom_status && <p className="selectable break-words text-muted">{profile.custom_status}</p>}
+          <p className="border-t border-line pt-2.5 text-xs text-faint">Üyelik: {formatDay(profile.created_at)}</p>
+        </div>
 
         {isMe ? (
           <Button
-            className="mt-5"
+            className="mt-4 w-full"
             onClick={() => {
               onClose()
               openModal({ kind: 'settings', tab: 'profile' })
@@ -44,7 +58,7 @@ export function ProfileModal({ userId, onClose }: { userId: string; onClose: () 
             Profilini düzenle
           </Button>
         ) : (
-          <div className="mt-5 flex flex-wrap justify-center gap-2">
+          <div className="mt-4 flex flex-wrap gap-2">
             {!blocked && (
               <Button
                 onClick={async () => {

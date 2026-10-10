@@ -142,7 +142,7 @@ function FileCard({ attachment }: { attachment: Attachment }) {
         <Icon className="size-5" />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="selectable truncate text-sm font-semibold text-fg" title={attachment.name}>
+        <p className="selectable truncate text-sm font-semibold text-fg" data-tip={attachment.name}>
           {attachment.name ?? 'Dosya'}
         </p>
         <p className="text-xs text-faint">{[ext, attachment.size ? formatBytes(attachment.size) : ''].filter(Boolean).join(' · ')}</p>
@@ -188,14 +188,14 @@ function MediaAttachment({ attachment, video }: { attachment: Attachment; video:
             onClick={() => void open()}
             disabled={loading}
             aria-label={video ? 'Videoyu oynat' : 'Sesi oynat'}
-            title={video ? 'Videoyu oynat' : 'Sesi oynat'}
+            data-tip={video ? 'Videoyu oynat' : 'Sesi oynat'}
             className="grid size-10 shrink-0 place-items-center rounded-full bg-accent text-on-accent transition-colors hover:bg-accent-hover"
           >
             {loading ? <Spinner className="size-4" /> : <Play className="size-5 translate-x-px" />}
           </button>
         )}
         <div className="min-w-0 flex-1">
-          <p className="selectable truncate text-sm font-semibold text-fg" title={attachment.name}>
+          <p className="selectable truncate text-sm font-semibold text-fg" data-tip={attachment.name}>
             {attachment.name ?? (video ? 'Video' : 'Ses')}
           </p>
           <p className="flex items-center gap-1 text-xs text-faint">

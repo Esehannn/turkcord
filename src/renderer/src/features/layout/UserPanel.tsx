@@ -38,7 +38,7 @@ export function UserPanel({ userId }: { userId: string }) {
         type="button"
         onClick={() => setMenuOpen((v) => !v)}
         className="flex min-w-0 flex-1 items-center gap-2 rounded-md p-1 text-left hover:bg-hover"
-        title="Durumunu değiştir"
+        data-tip="Durumunu değiştir"
       >
         <Avatar name={profile.display_name} path={profile.avatar_path} userId={userId} size={34} showStatus />
         <span className="min-w-0">

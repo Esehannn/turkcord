@@ -14,7 +14,8 @@ import { useVoice, type VoiceParticipant } from './store'
 // buradaki `applyVoiceState` o yayını listeye işler. Presence'taki kopya, kanala sonradan bakanlar içindir.
 
 export type VoiceFlags = { muted: boolean; deafened: boolean; at: number }
-type Meta = Partial<VoiceFlags>
+// since: kanala giriş anı; "seste geçen süre" bundan hesaplanır.
+type Meta = Partial<VoiceFlags> & { since?: number }
 
 const TRACK_EVERY_MS = 12_000
 const MAX_REVIVES = 5
@@ -25,7 +26,7 @@ type Entry = {
   ready: Promise<void>
   dm: boolean
   // En son bildirmek istediğim durum (kanaldaysam); bağlantı yeniden kurulunca tekrar bildirilir.
-  meta: VoiceFlags | null
+  meta: (VoiceFlags & { since: number }) | null
   // Presence güncellemelerini seyrelten zamanlayıcı.
   pacer: ReturnType<typeof coalesce>
   // Art arda kaç kez yeniden bağlanmak gerekti (sonsuz döngüye girmemek için).
@@ -41,7 +42,7 @@ function publish(channelId: string, entry: Entry): void {
   const list: VoiceParticipant[] = [...entry.present].map(([userId, meta]) => {
     const live = entry.fresh.get(userId)
     const best = live && live.at >= (meta.at ?? 0) ? live : meta
-    return { userId, muted: !!best.muted, deafened: !!best.deafened }
+    return { userId, muted: !!best.muted, deafened: !!best.deafened, since: typeof meta.since === 'number' ? meta.since : undefined }
   })
   useVoice.setState((s) => ({ rooms: { ...s.rooms, [channelId]: list } }))
 }
@@ -149,7 +150,7 @@ export async function trackVoice(channelId: string, userId: string, flags: { mut
   const entry = ensure(channelId, userId, dm)
   // Kanala ilk giriş hemen bildirilir; sonraki durum değişiklikleri seyreltilir.
   const joining = entry.meta === null
-  entry.meta = { ...flags, at: Date.now() }
+  entry.meta = { ...flags, at: Date.now(), since: entry.meta?.since ?? Date.now() }
   applyVoiceState(channelId, userId, entry.meta)
   await entry.ready
   const current = entries.get(channelId) ?? entry

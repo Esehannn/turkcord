@@ -1,7 +1,7 @@
 import { app, BrowserWindow, clipboard, Menu, nativeImage, session, shell } from 'electron'
 import { join } from 'node:path'
 import { registerAuthStorage } from './authStorage'
-import { hideOnClose, setupDesktop, startedHidden } from './desktop'
+import { hideOnClose, isQuitting, setupDesktop, startedHidden } from './desktop'
 import { registerWindowIpc, titleBarOverlay } from './windowIpc'
 import { setupUpdater } from './updater'
 import { isSafeExternalUrl, isTrustedUrl } from './security'
@@ -20,6 +20,51 @@ function iconPath(): string {
   return isDev ? join(__dirname, '../../resources/icon.png') : join(process.resourcesPath, 'icon.png')
 }
 
+const webPreferences: Electron.WebPreferences = {
+  preload: join(__dirname, '../preload/index.js'),
+  contextIsolation: true,
+  sandbox: true,
+  nodeIntegration: false,
+  webSecurity: true,
+  spellcheck: false,
+  devTools: isDev,
+}
+
+// Uygulamanın sayfasını yükler; hash verilirse o ekran açılır (ör. güncelleme penceresi).
+function loadApp(win: BrowserWindow, hash?: string): void {
+  if (isDev && process.env.ELECTRON_RENDERER_URL) {
+    void win.loadURL(process.env.ELECTRON_RENDERER_URL + (hash ? `#${hash}` : ''))
+  } else {
+    void win.loadFile(join(__dirname, '../renderer/index.html'), hash ? { hash } : undefined)
+  }
+}
+
+// Açılıştaki küçük güncelleme penceresi: uygulama açılmadan önce yeni sürüm denetlenir, varsa burada kurulur.
+function createUpdateWindow(): BrowserWindow {
+  const win = new BrowserWindow({
+    width: 320,
+    height: 380,
+    resizable: false,
+    maximizable: false,
+    minimizable: false,
+    fullscreenable: false,
+    frame: false,
+    center: true,
+    show: false,
+    title: 'Turkcord',
+    backgroundColor: '#ffffff',
+    icon: nativeImage.createFromPath(iconPath()),
+    webPreferences,
+  })
+  win.once('ready-to-show', () => win.show())
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  win.webContents.on('will-navigate', (event, url) => {
+    if (!isTrustedUrl(url)) event.preventDefault()
+  })
+  loadApp(win, 'guncelleme')
+  return win
+}
+
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1280,
@@ -33,15 +78,7 @@ function createWindow(): BrowserWindow {
     icon: nativeImage.createFromPath(iconPath()),
     // Windows'ta gri sistem çubuğu yerine uygulamanın kendi başlık çubuğu; küçült/kapat düğmeleri yine Windows'un.
     ...(process.platform === 'win32' ? { titleBarStyle: 'hidden' as const, titleBarOverlay: titleBarOverlay('light') } : {}),
-    webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
-      contextIsolation: true,
-      sandbox: true,
-      nodeIntegration: false,
-      webSecurity: true,
-      spellcheck: false,
-      devTools: isDev,
-    },
+    webPreferences,
   })
 
   // Windows açılışında başlatıldıysa tepside bekler.
@@ -85,12 +122,7 @@ function createWindow(): BrowserWindow {
     if (items.length) Menu.buildFromTemplate(items).popup({ window: win })
   })
 
-  if (isDev && process.env.ELECTRON_RENDERER_URL) {
-    void win.loadURL(process.env.ELECTRON_RENDERER_URL)
-  } else {
-    void win.loadFile(join(__dirname, '../renderer/index.html'))
-  }
-
+  loadApp(win)
   return win
 }
 
@@ -131,11 +163,21 @@ void app.whenReady().then(() => {
   hardenSession()
   registerAuthStorage()
   registerWindowIpc(() => mainWindow)
-  setupUpdater(() => mainWindow)
   setupDesktop(() => mainWindow, iconPath())
-  mainWindow = createWindow()
-  mainWindow.on('closed', () => {
-    mainWindow = null
+
+  // Önce güncelleme: pencere gösterilerek açıldıysa küçük güncelleme penceresi çıkar, uygulama ondan sonra açılır.
+  // Tepside sessizce başladıysa (Windows açılışı) uygulama doğrudan açılır, güncelleme arka planda iner.
+  const interactive = !startedHidden() && (app.isPackaged || process.env.TURKCORD_GUNCELLEME_DENEME === '1')
+  const updateWindow = interactive ? createUpdateWindow() : null
+  void setupUpdater(() => mainWindow, interactive).then(() => {
+    // Güncelleme penceresi kapatıldıysa uygulama kapanıyordur.
+    if (isQuitting()) return
+    mainWindow = createWindow()
+    mainWindow.on('closed', () => {
+      mainWindow = null
+    })
+    // Yeni pencere kurulduktan sonra kapatılır; yoksa "bütün pencereler kapandı" sayılıp uygulama çıkardı.
+    if (updateWindow && !updateWindow.isDestroyed()) updateWindow.destroy()
   })
 
   app.on('activate', () => {

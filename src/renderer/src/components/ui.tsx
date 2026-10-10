@@ -40,7 +40,7 @@ export function IconButton({
     <button
       type="button"
       aria-label={label}
-      title={label}
+      data-tip={label}
       {...props}
       className={`grid size-8 shrink-0 place-items-center rounded-md text-muted transition-colors hover:bg-hover hover:text-fg disabled:opacity-40 ${className}`}
     >
