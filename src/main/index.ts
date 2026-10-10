@@ -1,6 +1,7 @@
 import { app, BrowserWindow, clipboard, Menu, nativeImage, session, shell } from 'electron'
 import { join } from 'node:path'
 import { registerAuthStorage } from './authStorage'
+import { setupScreenCapture } from './capture'
 import { hideOnClose, isQuitting, setupDesktop, startedHidden } from './desktop'
 import { registerWindowIpc, titleBarOverlay } from './windowIpc'
 import { setupUpdater } from './updater'
@@ -129,13 +130,13 @@ function createWindow(): BrowserWindow {
 function hardenSession(): void {
   const ses = session.defaultSession
 
-  // Sadece gerekli izinler: mikrofon (sesli sohbet), bildirimler, panoya yazma.
-  const allowed = new Set(['media', 'notifications', 'clipboard-sanitized-write', 'fullscreen', 'speaker-selection'])
+  // Sadece gerekli izinler: mikrofon ve kamera (sesli / görüntülü sohbet), ekran paylaşımı, bildirimler, panoya yazma.
+  const allowed = new Set(['media', 'display-capture', 'notifications', 'clipboard-sanitized-write', 'fullscreen', 'speaker-selection'])
   ses.setPermissionRequestHandler((webContents, permission, callback, details) => {
     const trusted = isTrustedUrl(webContents.getURL())
     if (permission === 'media') {
       const types = (details as { mediaTypes?: string[] }).mediaTypes ?? []
-      callback(trusted && types.every((t) => t === 'audio'))
+      callback(trusted && types.every((t) => t === 'audio' || t === 'video'))
       return
     }
     callback(trusted && allowed.has(permission))
@@ -143,6 +144,9 @@ function hardenSession(): void {
   ses.setPermissionCheckHandler((webContents, permission) => {
     return !!webContents && isTrustedUrl(webContents.getURL()) && allowed.has(permission)
   })
+
+  // Ekran yakalama yalnızca kullanıcının uygulama içinde seçtiği kaynağa verilir.
+  setupScreenCapture(ses)
 }
 
 app.on('web-contents-created', (_event, contents) => {

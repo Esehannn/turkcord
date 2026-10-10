@@ -13,7 +13,7 @@ import { useVoice, type VoiceParticipant } from './store'
 // sağırlaştırma gibi sık değişen durumlar anında, sınırı olmayan yayın (broadcast) ile gider (bkz. engine.ts);
 // buradaki `applyVoiceState` o yayını listeye işler. Presence'taki kopya, kanala sonradan bakanlar içindir.
 
-export type VoiceFlags = { muted: boolean; deafened: boolean; at: number }
+export type VoiceFlags = { muted: boolean; deafened: boolean; screen?: boolean; camera?: boolean; at: number }
 // since: kanala giriş anı; "seste geçen süre" bundan hesaplanır.
 type Meta = Partial<VoiceFlags> & { since?: number }
 
@@ -42,7 +42,14 @@ function publish(channelId: string, entry: Entry): void {
   const list: VoiceParticipant[] = [...entry.present].map(([userId, meta]) => {
     const live = entry.fresh.get(userId)
     const best = live && live.at >= (meta.at ?? 0) ? live : meta
-    return { userId, muted: !!best.muted, deafened: !!best.deafened, since: typeof meta.since === 'number' ? meta.since : undefined }
+    return {
+      userId,
+      muted: !!best.muted,
+      deafened: !!best.deafened,
+      screen: best.screen === true,
+      camera: best.camera === true,
+      since: typeof meta.since === 'number' ? meta.since : undefined,
+    }
   })
   useVoice.setState((s) => ({ rooms: { ...s.rooms, [channelId]: list } }))
 }
@@ -146,7 +153,7 @@ export function watchVoiceRoom(channelId: string, userId: string, dm = false): (
 
 // "Kanaldayım" bilgisini ve susturma durumumu bildirir. Kendi ekranımda hemen görünür; sunucuya presence
 // güncellemesi ise seyrek gider (en fazla TRACK_EVERY_MS'de bir, her zaman en son durumla).
-export async function trackVoice(channelId: string, userId: string, flags: { muted: boolean; deafened: boolean }, dm = false): Promise<void> {
+export async function trackVoice(channelId: string, userId: string, flags: Omit<VoiceFlags, 'at'>, dm = false): Promise<void> {
   const entry = ensure(channelId, userId, dm)
   // Kanala ilk giriş hemen bildirilir; sonraki durum değişiklikleri seyreltilir.
   const joining = entry.meta === null

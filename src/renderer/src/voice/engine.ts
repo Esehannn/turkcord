@@ -6,6 +6,7 @@ import { toast } from '@/stores/toast'
 import { micErrorMessage, openMicrophone, type Microphone } from './mic'
 import { applyVoiceState, trackVoice, untrackVoice, watchVoiceRoom } from './presence'
 import { tuneOpus } from './sdp'
+import { onVideoSignal, startVideo, stopVideo, syncVideoRoom } from './video'
 import { voiceSounds } from './sounds'
 import { micOpen, useVoice, volumeOf, type PeerLink } from './store'
 
@@ -18,6 +19,8 @@ import { micOpen, useVoice, volumeOf, type PeerLink } from './store'
 // karşısının dinlemeye başladığını bilir ve teklif kaybolmaz.
 //
 // Bireysel aramalar da aynı motoru kullanır: kanal özel mesajın kanalıdır, sunucu yoktur (serverId null).
+//
+// Görüntü (ekran paylaşımı, kamera) bu ses bağlantılarından geçmez; ayrı bağlantılarla video.ts yönetir.
 
 export const MAX_PARTICIPANTS = 10
 const SPEAKING_THRESHOLD = 0.018
@@ -269,6 +272,7 @@ function onRoomChange(): void {
   const now = new Set((rooms[channelId] ?? []).map((p) => p.userId))
   // Sadece çıktığı görülenlerin bağlantısı kapanır; yeni gelenin presence bilgisi sinyalden geç gelebilir.
   for (const userId of [...peers.keys()]) if (lastRoom.has(userId) && !now.has(userId)) closePeer(userId)
+  syncVideoRoom()
   if (status === 'connected') {
     for (const userId of now) if (!lastRoom.has(userId) && userId !== me) voiceSounds.join()
     for (const userId of lastRoom) if (!now.has(userId) && userId !== me) voiceSounds.leave()
@@ -287,23 +291,27 @@ useVoice.subscribe((state, prev) => {
 //  - Seyrek: presence kaydı (kanala sonradan bakanlar için). Supabase 30 saniyede 5 presence çağrısından
 //    fazlasına izin vermediği için burada seyreltilir (bkz. presence.ts).
 const stateBroadcaster = coalesce(() => {
-  const { channelId, status, muted, deafened } = useVoice.getState()
+  const { channelId, status, muted, deafened, localScreen, localCamera } = useVoice.getState()
   if (!channelId || status !== 'connected' || !signal) return
-  void signal.send({ type: 'broadcast', event: 'durum', payload: { from: me, muted, deafened, at: Date.now() } })
+  void signal.send({
+    type: 'broadcast',
+    event: 'durum',
+    payload: { from: me, muted, deafened, screen: !!localScreen, camera: !!localCamera, at: Date.now() },
+  })
 }, 150)
 
 function publishState(): void {
-  const { channelId, muted, deafened } = useVoice.getState()
+  const { channelId, muted, deafened, localScreen, localCamera } = useVoice.getState()
   if (!channelId) return
-  void trackVoice(channelId, me, { muted, deafened }, dmRoom)
+  void trackVoice(channelId, me, { muted, deafened, screen: !!localScreen, camera: !!localCamera }, dmRoom)
   stateBroadcaster.trigger()
 }
 
 function onPeerState(payload: unknown): void {
-  const { from, muted, deafened, at } = (payload ?? {}) as { from?: unknown; muted?: unknown; deafened?: unknown; at?: unknown }
+  const { from, muted, deafened, screen, camera, at } = (payload ?? {}) as Record<string, unknown>
   const { channelId } = useVoice.getState()
   if (!channelId || typeof from !== 'string' || from === me || typeof at !== 'number') return
-  applyVoiceState(channelId, from, { muted: muted === true, deafened: deafened === true, at })
+  applyVoiceState(channelId, from, { muted: muted === true, deafened: deafened === true, screen: screen === true, camera: camera === true, at })
 }
 
 // Aç/kapa sesleri üst üste binmesin: hızlı tıklamalarda sadece aralıklı olanlar çalar.
@@ -450,9 +458,16 @@ export async function joinVoice(serverId: string | null, channelId: string, user
     .on('broadcast', { event: 'sinyal' }, ({ payload }) => void onSignal(payload as Signal))
     .on('broadcast', { event: 'efekt' }, ({ payload }) => onEffect(payload))
     .on('broadcast', { event: 'durum' }, ({ payload }) => onPeerState(payload))
+    .on('broadcast', { event: 'goruntu' }, ({ payload }) => void onVideoSignal(payload))
     .subscribe((status) => {
       if (status === 'SUBSCRIBED' && token === joinToken) {
         send({ type: 'hazir', from: me })
+        startVideo({
+          me,
+          send: (payload) => void signal?.send({ type: 'broadcast', event: 'goruntu', payload }),
+          iceServers: () => iceServers,
+          onLocalChange: publishState,
+        })
         publishState()
         setState({ status: 'connected' })
         voiceSounds.join()
@@ -471,6 +486,7 @@ export async function leaveVoice(playSound = true): Promise<void> {
   const { channelId } = useVoice.getState()
   joinToken++
   stateBroadcaster.cancel()
+  stopVideo()
   for (const userId of [...peers.keys()]) closePeer(userId)
   if (channelId) await untrackVoice(channelId).catch(() => {})
   unwatch?.()

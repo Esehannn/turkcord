@@ -143,6 +143,9 @@ export function VoiceSettings() {
             onChange={(outputDeviceId) => update({ outputDeviceId })}
           />
         </Field>
+        <Field label="Kamera" hint="Görüntülü sohbette kullanılır; kamera yalnızca sen açınca çalışır.">
+          <CameraSelect value={prefs.cameraDeviceId} onChange={(cameraDeviceId) => prefs.setPrefs({ cameraDeviceId })} />
+        </Field>
       </div>
 
       <div className="space-y-2">
@@ -283,6 +286,31 @@ export function VoiceSettings() {
 
 function SectionTitle({ children }: { children: ReactNode }) {
   return <p className="text-xs font-bold tracking-wide text-muted uppercase">{children}</p>
+}
+
+// Kamera listesi bu bölüm açılınca bir kez okunur. Kameraya henüz izin verilmediyse Windows adlarını vermez;
+// o durumda "Kamera 1", "Kamera 2" diye gösterilir.
+function CameraSelect({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const [cameras, setCameras] = useState<{ deviceId: string; label: string }[]>([])
+  useEffect(() => {
+    void navigator.mediaDevices
+      .enumerateDevices()
+      .then((list) =>
+        setCameras(list.filter((d) => d.kind === 'videoinput' && d.deviceId).map((d, i) => ({ deviceId: d.deviceId, label: d.label || `Kamera ${i + 1}` }))),
+      )
+      .catch(() => {})
+  }, [])
+  const missing = value !== 'default' && !cameras.some((c) => c.deviceId === value)
+  return (
+    <select value={missing ? 'default' : value} onChange={(e) => onChange(e.target.value)} className="h-10 w-full rounded-md border border-line bg-input px-2 text-sm text-fg">
+      <option value="default">Windows varsayılanı</option>
+      {cameras.map((c) => (
+        <option key={c.deviceId} value={c.deviceId}>
+          {c.label}
+        </option>
+      ))}
+    </select>
+  )
 }
 
 function DeviceSelect({

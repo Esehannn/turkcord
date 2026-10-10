@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { HeadphoneOff, MicOff } from 'lucide-react'
+import { HeadphoneOff, MicOff, Video } from 'lucide-react'
 import { Avatar } from '@/components/Avatar'
 import { Floating } from '@/components/Menu'
 import { useProfiles } from '@/data/queries'
@@ -47,6 +47,12 @@ export function VoiceRoom({ channelId, me }: { channelId: string; me: string }) 
               <span className={`min-w-0 flex-1 truncate ${talking ? 'font-semibold text-fg' : ''} ${connecting ? 'opacity-60' : ''}`}>
                 {name}
               </span>
+              {p.screen && (
+                <span className="shrink-0 rounded bg-accent px-1 text-[10px] leading-4 font-bold tracking-wide text-on-accent" data-tip="Ekranını paylaşıyor">
+                  CANLI
+                </span>
+              )}
+              {p.camera && <Video className="size-3.5 shrink-0 text-muted" aria-label="Kamerası açık" />}
               {inThisRoom && p.userId !== me && <PingBadge link={links[p.userId]} />}
               {p.muted && <MicOff className="size-3.5 shrink-0 text-accent" aria-label="Mikrofonu kapalı" />}
               {p.deafened && <HeadphoneOff className="size-3.5 shrink-0 text-accent" aria-label="Sağırlaştırılmış" />}

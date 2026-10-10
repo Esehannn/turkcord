@@ -6,7 +6,9 @@ import { ChannelSettingsModal, CreateChannelModal } from '@/features/servers/Cha
 import { CreateServerModal } from '@/features/servers/CreateServerModal'
 import { InviteModal } from '@/features/servers/InviteModal'
 import { ServerSettingsModal } from '@/features/servers/ServerSettingsModal'
+import { ShareScreenModal } from '@/features/voice/ShareScreenModal'
 import { ForwardModal, QuickSwitcher } from './QuickSwitcher'
+import { ShortcutsModal } from './ShortcutsModal'
 
 export function ModalHost() {
   const modal = useUi((s) => s.modal)
@@ -33,5 +35,9 @@ export function ModalHost() {
       return <CreatePollModal channelId={modal.channelId} onClose={close} />
     case 'quick-switch':
       return <QuickSwitcher onClose={close} />
+    case 'share-screen':
+      return <ShareScreenModal onClose={close} />
+    case 'shortcuts':
+      return <ShortcutsModal onClose={close} />
   }
 }
