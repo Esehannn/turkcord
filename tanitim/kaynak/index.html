@@ -367,7 +367,8 @@ const PAGES = {
   'logo-beyaz': () => `<div class="logo">${logo(1024, '#e30a17', '#fff')}</div>`,
 }
 // Adresteki değer yalnızca bilinen sayfalardan biriyse kullanılır.
-const page = Object.hasOwn(PAGES, q) ? PAGES[q] : PAGES[1]
+const pages = new Map(Object.entries(PAGES))
+const page = pages.get(q) ?? pages.get('1')
 document.body.innerHTML = page()
 </script>
 </body>
