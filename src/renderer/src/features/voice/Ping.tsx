@@ -14,7 +14,7 @@ export function linkTitle(link: PeerLink): string {
 export function PingBadge({ link }: { link: PeerLink | undefined }) {
   if (!link || link.ping === null) return null
   return (
-    <span className={`shrink-0 text-[11px] font-medium tabular-nums ${pingClass(link.ping)}`} title={linkTitle(link)}>
+    <span className={`shrink-0 text-[11px] font-medium tabular-nums ${pingClass(link.ping)}`} data-tip={linkTitle(link)}>
       {link.ping} ms
     </span>
   )

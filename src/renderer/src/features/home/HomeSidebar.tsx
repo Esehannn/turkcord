@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Bell, BellOff, Phone, User, Users } from 'lucide-react'
+import { BellOff, Phone, User, Users } from 'lucide-react'
 import { Avatar } from '@/components/Avatar'
 import { ContextMenu } from '@/components/Menu'
+import { muteHint, muteMenuItem } from '@/components/muteMenu'
 import { Badge } from '@/components/ui'
 import { useDms, useFriendships, useUnread } from '@/data/queries'
 import { useSession } from '@/stores/session'
@@ -17,7 +18,7 @@ export function HomeSidebar() {
   const { data: friendships = [] } = useFriendships()
   const call = useCall((s) => s.call)
   const muted = useUi((s) => s.muted)
-  const toggleMuted = useUi((s) => s.toggleMuted)
+  const mutedUntil = useUi((s) => s.mutedUntil)
   const openModal = useUi((s) => s.openModal)
   const [menu, setMenu] = useState<{ x: number; y: number; channelId: string; userId: string } | null>(null)
   const pending = friendships.filter((f) => f.status === 'pending' && f.addressee_id === me).length
@@ -65,7 +66,11 @@ export function HomeSidebar() {
                 {dm.custom_status && <span className="block truncate text-xs text-faint">{dm.custom_status}</span>}
               </span>
               {call?.channelId === dm.channel_id && <Phone className="size-4 shrink-0 text-online" aria-label="Arama sürüyor" />}
-              {isMuted && <BellOff className="size-3.5 shrink-0 text-faint" aria-label="Sessize alındı" />}
+              {isMuted && (
+                <span className="shrink-0 text-faint" data-tip={muteHint(mutedUntil[dm.channel_id])}>
+                  <BellOff className="size-3.5" aria-label="Sessize alındı" />
+                </span>
+              )}
               <Badge count={count} />
             </button>
           )
@@ -77,11 +82,7 @@ export function HomeSidebar() {
           y={menu.y}
           onClose={() => setMenu(null)}
           items={[
-            {
-              label: muted.includes(menu.channelId) ? 'Sesini aç' : 'Sessize al',
-              icon: muted.includes(menu.channelId) ? Bell : BellOff,
-              onClick: () => toggleMuted(menu.channelId),
-            },
+            muteMenuItem(menu.channelId, { on: 'Sessize al', off: 'Sesini aç' }),
             { label: 'Profili gör', icon: User, onClick: () => openModal({ kind: 'profile', userId: menu.userId }) },
           ]}
         />

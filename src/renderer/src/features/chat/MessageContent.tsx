@@ -75,7 +75,7 @@ function Spoiler({ children }: { children: ReactNode }) {
       tabIndex={0}
       className="spoiler px-0.5"
       data-revealed={revealed}
-      title={revealed ? undefined : 'Görmek için tıkla'}
+      data-tip={revealed ? undefined : 'Görmek için tıkla'}
       onClick={() => setRevealed(true)}
       onKeyDown={(e) => e.key === 'Enter' && setRevealed(true)}
     >

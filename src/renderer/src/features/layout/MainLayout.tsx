@@ -3,7 +3,7 @@ import { WifiOff } from 'lucide-react'
 import { useProfiles, useServers, useUnread } from '@/data/queries'
 import { usePresenceSync, useRealtimeSync } from '@/data/realtime'
 import { setUnreadBadge } from '@/lib/notify'
-import { isMuted, useUi } from '@/stores/ui'
+import { isMuted, useUi, type View } from '@/stores/ui'
 import { NotificationCards } from '@/components/NotificationCards'
 import { Splash } from '@/components/Splash'
 import { ChatView } from '@/features/chat/ChatView'
@@ -17,6 +17,7 @@ import { ServerRail } from './ServerRail'
 import { UserPanel } from './UserPanel'
 import { IncomingCall } from '@/features/voice/IncomingCall'
 import { VoicePanel } from '@/features/voice/VoicePanel'
+import { VoiceStage } from '@/features/voice/VoiceStage'
 import { initCalls } from '@/voice/call'
 import { leaveVoice } from '@/voice/engine'
 import { startDesktopBridge } from '@/lib/desktop'
@@ -111,14 +112,21 @@ export function MainLayout({ userId }: { userId: string }) {
         <UserPanel userId={userId} />
       </aside>
       <main className="flex min-w-0 flex-1 bg-chat">
-        {view.kind === 'home' && <FriendsView />}
-        {view.kind === 'dm' && <ChatView key={view.channelId} channelId={view.channelId} />}
-        {view.kind === 'server' &&
-          (view.channelId ? (
-            <ChatView key={view.channelId} channelId={view.channelId} serverId={view.serverId} />
-          ) : (
-            <EmptyState icon={<TeaGlass />} title="Bir kanal seç" text="Soldaki listeden bir yazı kanalı seç ya da Ctrl+K ile ara." />
-          ))}
+        {/* İçerik değişince (başka sohbet, kanal ya da ses odası) kısa bir solmayla gelir. */}
+        <div key={viewKey(view)} className="anim-fade flex min-w-0 flex-1">
+          {view.kind === 'home' && <FriendsView />}
+          {view.kind === 'dm' && <ChatView channelId={view.channelId} />}
+          {view.kind === 'server' &&
+            (view.voiceId ? (
+              <VoiceStage serverId={view.serverId} channelId={view.voiceId} me={userId} />
+            ) : view.channelId ? (
+              <ChatView channelId={view.channelId} serverId={view.serverId} />
+            ) : (
+              <div className="flex-1">
+                <EmptyState icon={<TeaGlass />} title="Bir kanal seç" text="Soldaki listeden bir yazı kanalı seç ya da Ctrl+K ile ara." />
+              </div>
+            ))}
+        </div>
         {view.kind === 'server' && memberList && <MemberList serverId={view.serverId} />}
       </main>
       <ModalHost />
@@ -126,6 +134,13 @@ export function MainLayout({ userId }: { userId: string }) {
       <NotificationCards />
     </div>
   )
+}
+
+// Ortadaki içeriğin kimliği: değişince içerik baştan kurulur.
+function viewKey(view: View): string {
+  if (view.kind === 'home') return 'ana'
+  if (view.kind === 'dm') return `dm:${view.channelId}`
+  return view.voiceId ? `ses:${view.voiceId}` : `kanal:${view.channelId ?? view.serverId}`
 }
 
 const RETRY_EVERY_MS = 15_000

@@ -1,7 +1,8 @@
 import { useState, type MouseEvent } from 'react'
-import { Bell, BellOff, Plus, UserPlus } from 'lucide-react'
+import { Plus, UserPlus } from 'lucide-react'
 import { Logo } from '@/components/Logo'
 import { ContextMenu } from '@/components/Menu'
+import { muteMenuItem } from '@/components/muteMenu'
 import { useServers, useUnread } from '@/data/queries'
 import { initials } from '@/lib/format'
 import { publicImageUrl } from '@/lib/supabase'
@@ -15,7 +16,6 @@ export function ServerRail() {
   const setView = useUi((s) => s.setView)
   const openModal = useUi((s) => s.openModal)
   const muted = useUi((s) => s.muted)
-  const toggleMuted = useUi((s) => s.toggleMuted)
   const [menu, setMenu] = useState<{ x: number; y: number; serverId: string } | null>(null)
 
   let dmUnread = 0
@@ -75,11 +75,7 @@ export function ServerRail() {
           y={menu.y}
           onClose={() => setMenu(null)}
           items={[
-            {
-              label: muted.includes(menu.serverId) ? 'Sunucunun sesini aç' : 'Sunucuyu sessize al',
-              icon: muted.includes(menu.serverId) ? Bell : BellOff,
-              onClick: () => toggleMuted(menu.serverId),
-            },
+            muteMenuItem(menu.serverId, { on: 'Sunucuyu sessize al', off: 'Sunucunun sesini aç' }),
             { label: 'Arkadaş davet et', icon: UserPlus, onClick: () => openModal({ kind: 'invite', serverId: menu.serverId }) },
           ]}
         />
@@ -114,7 +110,8 @@ function RailItem({
       />
       <button
         type="button"
-        title={label}
+        data-tip={label}
+        data-tip-side="right"
         aria-label={label}
         aria-current={active ? 'page' : undefined}
         onClick={onClick}

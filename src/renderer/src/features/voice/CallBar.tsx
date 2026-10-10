@@ -125,7 +125,7 @@ export function RoundButton({
   return (
     <button
       type="button"
-      title={label}
+      data-tip={label}
       aria-label={label}
       onClick={onClick}
       className={`grid ${size} shrink-0 place-items-center rounded-full transition-colors ${TONES[tone]}`}

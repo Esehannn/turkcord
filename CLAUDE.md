@@ -21,7 +21,9 @@ Arayüz metinleri, kod yorumları ve commit mesajları Türkçe.
 
 ## Sesler ve dosyalar
 
-- Uygulamada ses dosyası yok: bildirim sesleri, arama melodisi ve ses efektleri `src/renderer/src/lib/sounds.ts`'te sentezlenir.
+- Uygulamada ses dosyası yok: bildirim sesleri, arama melodisi, ses kanalı işaretleri ve ses efektleri
+  `src/renderer/src/lib/sounds.ts`'te sentezlenir. Ses teması mehterdir: yeni bir ses eklerken oradaki `mallet` / `motif`
+  yardımcılarını ve "Ceddin Deden" notalarını (Mi karar) kullan.
 - Alias (`@/`) kullanmayan saf yardımcılar (`lib/files.ts`, `lib/coalesce.ts`, `lib/format.ts`, `lib/markdown.ts`, `lib/search.ts`) `node --test` ile doğrudan test edilir;
   bu dosyalara alias'lı içe aktarım ekleme.
 - Bireysel aramalar ses kanallarıyla aynı motoru kullanır (`voice/engine.ts`, `serverId` null); çaldırma `calls` tablosundan geçer (`voice/call.ts`).
@@ -30,6 +32,7 @@ Arayüz metinleri, kod yorumları ve commit mesajları Türkçe.
 
 - Menü ve açılır kutular `components/Menu.tsx` ile sayfanın üstüne (portal) çizilir; kaydırılabilir bir listenin içine
   `absolute` kutu koyma, kenarda kesilir.
+- İpucu için `title` kullanma; öğeye `data-tip="…"` yaz (`components/Tooltip.tsx` tek dinleyiciyle hepsini çizer).
 - Renkleri sabit yazma: vurgu rengi ayarlardan değişir (`--tc-accent`, Tailwind'de `accent`), tonları ondan türetilir.
 - Sessize alma ve görünüm tercihleri bu bilgisayarda (`stores/ui.ts`) tutulur, sunucuya gitmez.
 
@@ -49,4 +52,5 @@ Kullanıcı adı kuralı da `src/shared/username.ts` ile `supabase/functions/_sh
 ## Güvenlik
 
 Repoda gizli bilgi olmaz (`.env` git dışı). Mesajlar HTML olarak işlenmez. Electron penceresi sandbox + CSP ile çalışır;
+açılıştaki güncelleme penceresi aynı sayfayı `#guncelleme` ile açar ve uygulamanın kendisini (oturum, Supabase) yüklemez;
 yeni IPC kanalı eklerken `isTrustedSender` kontrolü yap.

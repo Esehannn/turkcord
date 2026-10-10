@@ -10,6 +10,7 @@ import { useUi } from '@/stores/ui'
 import { hangUp, useCall } from '@/voice/call'
 import { leaveVoice, sendEffect } from '@/voice/engine'
 import { useVoice } from '@/voice/store'
+import { rememberedChannel } from '@/features/layout/ServerRail'
 import { useCallSeconds } from './CallBar'
 import { linkTitle, pingClass } from './Ping'
 
@@ -65,14 +66,14 @@ export function VoicePanel() {
         <button
           type="button"
           className="min-w-0 flex-1 text-left"
-          onClick={() => setView(serverId ? { kind: 'server', serverId, channelId: null } : { kind: 'dm', channelId })}
-          title={inCall ? 'Sohbete git' : 'Sunucuya git'}
+          onClick={() => setView(serverId ? { kind: 'server', serverId, channelId: rememberedChannel(serverId), voiceId: channelId } : { kind: 'dm', channelId })}
+          data-tip={inCall ? 'Sohbete git' : 'Ses odasını aç'}
         >
           <span className={`flex items-center gap-1.5 text-sm font-semibold tabular-nums ${color}`}>
             <Signal className="size-4" />
             {label}
             {!trouble && !pending && !ringing && worst !== null && (
-              <span className={`text-xs font-medium ${pingClass(worst)}`} title={tooltip}>
+              <span className={`text-xs font-medium ${pingClass(worst)}`} data-tip={tooltip}>
                 · {worst} ms{relayed ? ' ☁' : ''}
               </span>
             )}

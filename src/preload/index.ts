@@ -23,6 +23,7 @@ const api: TurkcordApi = {
   },
   installUpdate: () => ipcRenderer.invoke('guncelleme:kur'),
   updateStage: () => ipcRenderer.invoke('guncelleme:asama-oku'),
+  skipUpdate: () => ipcRenderer.send('guncelleme:atla'),
   onUpdateStage: (callback) => {
     const listener = (_event: unknown, stage: unknown) => {
       if (stage && typeof stage === 'object' && typeof (stage as { phase?: unknown }).phase === 'string') callback(stage as UpdateStage)

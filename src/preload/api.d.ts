@@ -15,17 +15,18 @@ export interface TurkcordApi {
   updateReady: () => Promise<string | null>
   onUpdateReady: (callback: (version: string) => void) => () => void
   installUpdate: () => Promise<void>
-  // Açılıştaki güncelleme denetiminin aşaması (denetleniyor, indiriliyor, hazır…).
+  // Açılıştaki güncelleme penceresi: denetimin aşaması (denetleniyor, indiriliyor, hazır…) ve "şimdilik atla".
   updateStage: () => Promise<UpdateStage | null>
   onUpdateStage: (callback: (stage: UpdateStage) => void) => () => void
+  skipUpdate: () => void
   // Masaüstü: tepsiye küçültme, Windows ile başlatma, her yerde çalışan kısayollar.
   desktopSettings: () => Promise<DesktopSettings | null>
   setDesktopSettings: (patch: Partial<DesktopSettings>) => Promise<DesktopSettings | null>
   setShortcuts: (shortcuts: { mute: string | null; deafen: string | null }) => Promise<{ mute: boolean; deafen: boolean } | null>
   onShortcut: (callback: (command: 'mute' | 'deafen') => void) => () => void
   reportVoiceStatus: (status: { inVoice: boolean; muted: boolean; deafened: boolean }) => void
-  // Başlık çubuğundaki Windows düğmelerinin rengi temaya ve vurgu rengine uyar.
-  setTheme: (theme: 'light' | 'dark', accent?: string) => void
+  // Başlık çubuğundaki Windows düğmelerinin zemini: açık temada vurgu rengi, koyu temada sol şeridin rengi.
+  setTheme: (theme: 'light' | 'dark', bar?: string) => void
   // Gelen arama: pencere tepsideyse odağı çalmadan gösterir, görev çubuğunda yanıp söner.
   requestAttention: () => void
   // Bildirime tıklanınca pencereyi öne getirir.
@@ -39,8 +40,6 @@ export type UpdateStage = {
   // İndirme yüzdesi (0-100).
   percent: number
   version: string | null
-  // İndirme bitince açılış ekranı kendiliğinden kurup yeniden başlatsın mı?
-  autoInstall: boolean
 }
 
 declare global {

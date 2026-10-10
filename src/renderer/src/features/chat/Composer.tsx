@@ -57,7 +57,8 @@ export function Composer({
   const [sending, setSending] = useState(false)
   // Yükleme ilerlemesi (0-1); dosya yokken null.
   const [progress, setProgress] = useState<number | null>(null)
-  const [picker, setPicker] = useState(false)
+  // Emoji kutusu açıksa onu açan düğmenin ekrandaki yeri.
+  const [picker, setPicker] = useState<DOMRect | null>(null)
   const [mention, setMention] = useState<{ start: number; query: string } | null>(null)
   const [mentionIndex, setMentionIndex] = useState(0)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -261,7 +262,7 @@ export function Composer({
                 ) : (
                   <>
                     <FileIcon className="size-6 text-accent" />
-                    <span className="truncate pr-5 text-xs font-semibold text-fg" title={f.file.name}>
+                    <span className="truncate pr-5 text-xs font-semibold text-fg" data-tip={f.file.name}>
                       {f.file.name}
                     </span>
                     <span className="text-[11px] text-faint">{formatBytes(f.file.size)}</span>
@@ -322,21 +323,20 @@ export function Composer({
           <IconButton label="Anket oluştur" className="mb-1.5" disabled={sending} onClick={() => openModal({ kind: 'create-poll', channelId })}>
             <BarChart3 className="size-5" />
           </IconButton>
-          <div className="relative mb-1.5">
-            <IconButton label="Emoji" onClick={() => setPicker((v) => !v)}>
-              <Smile className="size-5" />
-            </IconButton>
-            {picker && (
-              <EmojiPicker
-                onPick={(emoji) => {
-                  setText((t) => t + emoji)
-                  setPicker(false)
-                  inputRef.current?.focus()
-                }}
-                onClose={() => setPicker(false)}
-              />
-            )}
-          </div>
+          <IconButton label="Emoji" className={`mb-1.5 ${picker ? 'bg-selected text-fg' : ''}`} onClick={(e) => setPicker(e.currentTarget.getBoundingClientRect())}>
+            <Smile className="size-5" />
+          </IconButton>
+          {picker && (
+            <EmojiPicker
+              anchor={picker}
+              onPick={(emoji) => {
+                setText((t) => t + emoji)
+                setPicker(null)
+                inputRef.current?.focus()
+              }}
+              onClose={() => setPicker(null)}
+            />
+          )}
           <IconButton
             label="Gönder"
             className="mb-1.5 text-accent hover:text-accent"

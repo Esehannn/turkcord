@@ -1,3 +1,5 @@
+import { Floating } from '@/components/Menu'
+
 // Sık kullanılan emojiler. Harici kütüphane ya da ağ isteği yok.
 export const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '☕', '🔥', '🇹🇷']
 
@@ -12,24 +14,18 @@ const EMOJIS = [
   '⚽', '🏀', '🎮', '🕹️', '🎧', '🎵', '🎸', '📺', '💻', '📱', '📸', '🚗', '✈️', '🏖️', '⏰', '💸',
 ]
 
-export function EmojiPicker({ onPick, onClose }: { onPick: (emoji: string) => void; onClose: () => void }) {
+// Kutu, kendisini açan düğmenin (anchor) üstüne ve sayfanın en üst katmanına çizilir; mesaj listesinin ya da
+// yazı alanının sınırında kesilmez.
+export function EmojiPicker({ anchor, onPick, onClose }: { anchor: DOMRect; onPick: (emoji: string) => void; onClose: () => void }) {
   return (
-    <>
-      <div className="fixed inset-0 z-30" onClick={onClose} />
-      <div className="anim-pop absolute right-0 bottom-full z-40 mb-2 w-80 rounded-lg border border-line bg-elevated p-2 shadow-pop">
-        <div className="grid max-h-60 grid-cols-8 gap-0.5 overflow-y-auto scroll-thin">
-          {EMOJIS.map((emoji) => (
-            <button
-              key={emoji}
-              type="button"
-              onClick={() => onPick(emoji)}
-              className="grid size-9 place-items-center rounded-md text-xl hover:bg-hover"
-            >
-              {emoji}
-            </button>
-          ))}
-        </div>
+    <Floating x={anchor.right} y={anchor.top - 8} above flipY={anchor.bottom + 8} align="end" onClose={onClose} className="w-80 p-2">
+      <div className="grid max-h-60 grid-cols-8 gap-0.5 overflow-x-hidden overflow-y-auto scroll-thin">
+        {EMOJIS.map((emoji) => (
+          <button key={emoji} type="button" onClick={() => onPick(emoji)} className="grid h-9 place-items-center rounded-md text-xl hover:bg-hover">
+            {emoji}
+          </button>
+        ))}
       </div>
-    </>
+    </Floating>
   )
 }

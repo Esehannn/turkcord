@@ -25,7 +25,7 @@ export function UpdateBanner() {
       >
         Yeniden başlat ve güncelle
       </button>
-      <button type="button" aria-label="Sonra" title="Sonra (kapatınca kurulur)" onClick={() => setHidden(true)} className="opacity-80 hover:opacity-100">
+      <button type="button" aria-label="Sonra" data-tip="Sonra (kapatınca kurulur)" onClick={() => setHidden(true)} className="opacity-80 hover:opacity-100">
         <X className="size-4" />
       </button>
     </div>

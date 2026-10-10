@@ -320,7 +320,7 @@ function LevelBar({ db, open, threshold, active }: { db: number; open: boolean; 
         className={`h-full rounded-full transition-[width] duration-75 ${open ? 'bg-online' : 'bg-faint/60'}`}
         style={{ width: `${active ? toPercent(db) : 0}%` }}
       />
-      <div className="absolute inset-y-0 w-0.5 bg-accent" style={{ left: `${toPercent(threshold)}%` }} title="Hassasiyet eşiği" />
+      <div className="absolute inset-y-0 w-0.5 bg-accent" style={{ left: `${toPercent(threshold)}%` }} data-tip="Hassasiyet eşiği" />
     </div>
   )
 }

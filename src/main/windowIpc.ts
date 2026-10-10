@@ -6,11 +6,12 @@ const BADGE_PREFIX = 'data:image/png;base64,'
 export const TITLE_BAR_HEIGHT = 32
 
 // Başlık çubuğundaki Windows düğmelerinin (küçült, büyüt, kapat) renkleri; arayüzdeki çubukla aynı.
-// Açık temada çubuk vurgu rengindedir (varsayılan kırmızı).
-export function titleBarOverlay(theme: 'light' | 'dark', accent = '#e30a17'): Electron.TitleBarOverlayOptions {
+// Çubuğun rengini arayüz bildirir: açık temada vurgu rengi (varsayılan kırmızı), koyu temada seçili tonun
+// sol şerit rengi.
+export function titleBarOverlay(theme: 'light' | 'dark', bar?: string): Electron.TitleBarOverlayOptions {
   return theme === 'dark'
-    ? { color: '#121214', symbolColor: '#f2f2f3', height: TITLE_BAR_HEIGHT }
-    : { color: accent, symbolColor: '#ffffff', height: TITLE_BAR_HEIGHT }
+    ? { color: bar ?? '#121214', symbolColor: '#f2f2f3', height: TITLE_BAR_HEIGHT }
+    : { color: bar ?? '#e30a17', symbolColor: '#ffffff', height: TITLE_BAR_HEIGHT }
 }
 
 export function registerWindowIpc(getWindow: () => BrowserWindow | null): void {

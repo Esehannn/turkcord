@@ -47,6 +47,26 @@ export function initials(name: string): string {
   return (parts[0][0] + parts[1][0]).toLocaleUpperCase('tr-TR')
 }
 
+// Geçen süre (ses kanalında ne kadardır olduğu): "şimdi", "42 dk", "1 sa 5 dk".
+export function elapsedLabel(ms: number): string {
+  const minutes = Math.floor(ms / 60_000)
+  if (minutes < 1) return 'şimdi'
+  if (minutes < 60) return `${minutes} dk`
+  const hours = Math.floor(minutes / 60)
+  const rest = minutes % 60
+  return rest ? `${hours} sa ${rest} dk` : `${hours} sa`
+}
+
+export type MuteSpan = 'saat' | 'sekiz-saat' | 'yarin' | 'suresiz'
+
+// Sessize almanın biteceği an (ms); süresizse null. "Yarına kadar": ertesi sabah 08.00.
+export function muteDeadline(span: MuteSpan, now: Date = new Date()): number | null {
+  if (span === 'saat') return now.getTime() + 3_600_000
+  if (span === 'sekiz-saat') return now.getTime() + 8 * 3_600_000
+  if (span === 'yarin') return new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 8).getTime()
+  return null
+}
+
 // Kanal adı: küçük harf, boşluk yerine tire (Türkçe karakterler korunur).
 export function normalizeChannelName(name: string): string {
   return name

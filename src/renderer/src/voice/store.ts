@@ -1,7 +1,8 @@
 import { create } from 'zustand'
 import type { EffectId } from '@/lib/sounds'
 
-export type VoiceParticipant = { userId: string; muted: boolean; deafened: boolean }
+// since: kanala girdiği an (ms, kendi saatine göre); eski sürümler bildirmez.
+export type VoiceParticipant = { userId: string; muted: boolean; deafened: boolean; since?: number }
 export type VoiceStatus = 'idle' | 'connecting' | 'connected'
 // kapali: işlem yok, standart: tarayıcının gürültü engellemesi, guclu: yapay zekâ (RNNoise).
 export type NoiseMode = 'kapali' | 'standart' | 'guclu'

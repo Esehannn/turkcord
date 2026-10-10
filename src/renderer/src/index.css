@@ -39,6 +39,10 @@
   --tc-offline: #9a9aa3;
   --tc-success: #1f8f4e;
 
+  /* İpucu etiketi: temanın tersi renkte, küçük ve okunaklı. */
+  --tc-tip: #18181b;
+  --tc-tip-text: #f4f4f5;
+
   --tc-shadow: 0 10px 34px rgba(0, 0, 0, 0.14);
   color-scheme: light;
 }
@@ -71,8 +75,35 @@
   --tc-offline: #6f6f78;
   --tc-success: #3ac477;
 
+  --tc-tip: #0b0b0d;
+  --tc-tip-text: #f2f2f3;
+
   --tc-shadow: 0 10px 34px rgba(0, 0, 0, 0.5);
   color-scheme: dark;
+}
+
+/* Koyu temanın tonları (stores/ui.ts'teki DARK_TONES ile aynı). Gece: lacivertimsi; siyah: tam siyah zemin. */
+[data-theme='dark'][data-tone='gece'] {
+  --tc-rail: #0c1120;
+  --tc-rail-item: #1c2438;
+  --tc-sidebar: #131a2b;
+  --tc-chat: #192135;
+  --tc-elevated: #212b43;
+  --tc-input: #0f1524;
+  --tc-line: #2a3550;
+  --tc-muted: #a6adc2;
+  --tc-faint: #6f7893;
+  --tc-tip: #070a14;
+}
+[data-theme='dark'][data-tone='siyah'] {
+  --tc-rail: #000000;
+  --tc-rail-item: #1a1a1c;
+  --tc-sidebar: #0b0b0c;
+  --tc-chat: #000000;
+  --tc-elevated: #161618;
+  --tc-input: #111113;
+  --tc-line: #252528;
+  --tc-tip: #1c1c1f;
 }
 
 /* Vurgu renkleri (stores/ui.ts'teki ACCENTS ile aynı). */
@@ -128,6 +159,8 @@
   --color-dnd: var(--tc-dnd);
   --color-offline: var(--tc-offline);
   --color-success: var(--tc-success);
+  --color-tip: var(--tc-tip);
+  --color-tip-text: var(--tc-tip-text);
   --shadow-pop: var(--tc-shadow);
 }
 
@@ -232,6 +265,14 @@ textarea:focus-visible {
 }
 .titlebar button,
 .titlebar a {
+  -webkit-app-region: no-drag;
+}
+
+/* Açılıştaki çerçevesiz güncelleme penceresi her yerinden sürüklenebilir. */
+.update-window {
+  -webkit-app-region: drag;
+}
+.update-window button {
   -webkit-app-region: no-drag;
 }
 

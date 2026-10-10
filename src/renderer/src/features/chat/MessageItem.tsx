@@ -83,7 +83,8 @@ export const MessageItem = memo(function MessageItem({
 }: Props) {
   const actions = useActions()
   const openModal = useUi((s) => s.openModal)
-  const [picker, setPicker] = useState(false)
+  // Tepki kutusu açıksa onu açan düğmenin ekrandaki yeri.
+  const [picker, setPicker] = useState<DOMRect | null>(null)
   const [copied, setCopied] = useState(false)
   const [menu, setMenu] = useState<{ x: number; y: number; selection: string } | null>(null)
   // Az önce gelen mesaj hafif bir animasyonla belirir (eski mesajlar yüklenirken değil).
@@ -101,7 +102,7 @@ export const MessageItem = memo(function MessageItem({
   const reactionGroups = groupReactions(message.reactions, me.id)
 
   const react = (emoji: string) => {
-    setPicker(false)
+    setPicker(null)
     const existing = message.reactions.find((r) => r.emoji === emoji && r.user_id === me.id)
     void actions.toggleReaction(message.id, emoji, me.id, existing?.id)
   }
@@ -147,7 +148,7 @@ export const MessageItem = memo(function MessageItem({
       id={`mesaj-${message.id}`}
       onContextMenu={onContextMenu}
       className={`group relative px-4 ${showHeader ? 'mt-3 pt-1 compact:mt-1' : ''} py-0.5 ${fresh ? 'anim-msg' : ''} ${
-        mentioned ? 'border-l-2 border-accent bg-mention' : `border-l-2 border-transparent hover:bg-hover ${menu ? 'bg-hover' : ''}`
+        mentioned ? 'border-l-2 border-accent bg-mention' : `border-l-2 border-transparent hover:bg-hover ${menu || picker ? 'bg-hover' : ''}`
       }`}
     >
       {message.reply_to && (
@@ -232,7 +233,7 @@ export const MessageItem = memo(function MessageItem({
                   key={g.emoji}
                   type="button"
                   disabled={!canPost}
-                  title={g.users.map(profileName).join(', ')}
+                  data-tip={g.users.map(profileName).join(', ')}
                   onClick={() => react(g.emoji)}
                   className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-sm transition-colors ${
                     g.mine ? 'border-accent bg-accent-soft text-fg' : 'border-line bg-input text-muted hover:border-faint'
@@ -254,7 +255,7 @@ export const MessageItem = memo(function MessageItem({
       </div>
 
       {!editing && (canPost || !!message.content) && (
-        <div className="absolute -top-4 right-4 hidden items-center rounded-md border border-line bg-elevated shadow-pop group-hover:flex">
+        <div className={`absolute -top-4 right-4 items-center rounded-md border border-line bg-elevated shadow-pop ${picker ? 'flex' : 'hidden group-hover:flex'}`}>
           {canPost &&
             QUICK_REACTIONS.slice(0, 4).map((emoji) => (
               <button key={emoji} type="button" onClick={() => react(emoji)} className="grid size-8 place-items-center text-base hover:bg-hover">
@@ -262,12 +263,12 @@ export const MessageItem = memo(function MessageItem({
               </button>
             ))}
           {canPost && (
-            <div className="relative">
-              <IconButton label="Tepki ekle" onClick={() => setPicker(true)}>
+            <>
+              <IconButton label="Tepki ekle" className={picker ? 'bg-selected text-fg' : ''} onClick={(e) => setPicker(e.currentTarget.getBoundingClientRect())}>
                 <SmilePlus className="size-4" />
               </IconButton>
-              {picker && <EmojiPicker onPick={react} onClose={() => setPicker(false)} />}
-            </div>
+              {picker && <EmojiPicker anchor={picker} onPick={react} onClose={() => setPicker(null)} />}
+            </>
           )}
           {canPost && (
             <IconButton label="Yanıtla" onClick={() => onReply(message)}>

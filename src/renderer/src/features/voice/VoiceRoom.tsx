@@ -60,7 +60,7 @@ export function VoiceRoom({ channelId, me }: { channelId: string; me: string }) 
 }
 
 // Kanal listesinin dışına (sayfanın üstüne) çizilir; yoksa dar listenin kenarında kesilirdi.
-function ParticipantMenu({ userId, isMe, x, y, onClose }: { userId: string; isMe: boolean; x: number; y: number; onClose: () => void }) {
+export function ParticipantMenu({ userId, isMe, x, y, onClose }: { userId: string; isMe: boolean; x: number; y: number; onClose: () => void }) {
   const volume = useVoice((s) => s.volumes[userId] ?? 1)
   const openModal = useUi((s) => s.openModal)
   return (

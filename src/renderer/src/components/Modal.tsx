@@ -11,6 +11,7 @@ export function Modal({
   children,
   footer,
   width = 'max-w-md',
+  bare = false,
 }: {
   title: ReactNode
   subtitle?: ReactNode
@@ -18,6 +19,8 @@ export function Modal({
   children: ReactNode
   footer?: ReactNode
   width?: string
+  // Başlıksız ve boşluksuz: içerik pencerenin kenarlarına kadar uzanır (ör. profil kartının üst şeridi).
+  bare?: boolean
 }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -35,16 +38,27 @@ export function Modal({
       }}
     >
       <div role="dialog" aria-modal className={`anim-pop w-full ${width} overflow-hidden rounded-xl bg-elevated shadow-pop`}>
-        <div className="flex items-start justify-between gap-4 px-5 pt-5">
-          <div>
-            <h2 className="text-lg font-bold text-fg">{title}</h2>
-            {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
+        {bare ? (
+          <div className="relative max-h-[80vh] overflow-y-auto scroll-thin">
+            <IconButton label="Kapat" onClick={onClose} className="absolute top-2.5 right-2.5 z-10 bg-black/25 text-white hover:bg-black/40 hover:text-white">
+              <X className="size-5" />
+            </IconButton>
+            {children}
           </div>
-          <IconButton label="Kapat" onClick={onClose}>
-            <X className="size-5" />
-          </IconButton>
-        </div>
-        <div className="max-h-[70vh] overflow-y-auto px-5 py-4 scroll-thin">{children}</div>
+        ) : (
+          <>
+            <div className="flex items-start justify-between gap-4 px-5 pt-5">
+              <div>
+                <h2 className="text-lg font-bold text-fg">{title}</h2>
+                {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
+              </div>
+              <IconButton label="Kapat" onClick={onClose}>
+                <X className="size-5" />
+              </IconButton>
+            </div>
+            <div className="max-h-[70vh] overflow-y-auto px-5 py-4 scroll-thin">{children}</div>
+          </>
+        )}
         {footer && <div className="flex justify-end gap-2 bg-sidebar px-5 py-3">{footer}</div>}
       </div>
     </div>,

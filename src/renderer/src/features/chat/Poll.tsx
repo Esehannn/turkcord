@@ -30,7 +30,7 @@ export function PollMessage({ message, me, canVote, profileName }: { message: Ch
               key={i}
               type="button"
               disabled={!canVote}
-              title={
+              data-tip={
                 message.votes
                   .filter((v) => v.option === i)
                   .map((v) => profileName(v.user_id))

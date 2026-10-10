@@ -22,7 +22,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import { useSession } from '@/stores/session'
 import { toast } from '@/stores/toast'
-import { ACCENTS, useUi, type ChatFont, type Theme } from '@/stores/ui'
+import { ACCENTS, DARK_TONES, useUi, type ChatFont } from '@/stores/ui'
 import { checkPassword, PASSWORD_MESSAGES } from '@shared/password'
 import { AdminPanel } from './AdminPanel'
 import { VoiceSettings } from './VoiceSettings'
@@ -46,7 +46,8 @@ export function SettingsModal({ initialTab = 'profile', onClose }: { initialTab?
 
   return (
     <Modal title="Ayarlar" onClose={onClose} width="max-w-3xl">
-      <div className="flex min-h-[420px] gap-6">
+      {/* Yükseklik sabittir: sekme değişince pencere uzayıp kısalmaz, yalnızca sağdaki içerik kayar. */}
+      <div className="flex h-[min(560px,64vh)] gap-6">
         <nav className="flex w-44 shrink-0 flex-col gap-0.5">
           {tabs
             .filter((t) => t.show)
@@ -65,7 +66,7 @@ export function SettingsModal({ initialTab = 'profile', onClose }: { initialTab?
             ))}
           <p className="selectable mt-auto px-3 pt-4 text-xs text-faint">Turkcord {__APP_VERSION__}</p>
         </nav>
-        <div className="min-w-0 flex-1">
+        <div key={tab} className="anim-fade min-w-0 flex-1 overflow-y-auto pr-2 scroll-thin">
           {tab === 'profile' && <ProfileTab userId={me} />}
           {tab === 'voice' && <VoiceSettings />}
           {tab === 'appearance' && <AppearanceTab />}
@@ -182,32 +183,42 @@ const CHAT_FONTS: { value: ChatFont; label: string; size: string }[] = [
 
 function AppearanceTab() {
   const theme = useUi((s) => s.theme)
+  const darkTone = useUi((s) => s.darkTone)
   const accent = useUi((s) => s.accent)
   const chatFont = useUi((s) => s.chatFont)
   const compact = useUi((s) => s.compact)
   const setPrefs = useUi((s) => s.setPrefs)
-  const options: { value: Theme; label: string; preview: string }[] = [
-    { value: 'light', label: 'Açık', preview: 'bg-white' },
-    { value: 'dark', label: 'Koyu', preview: 'bg-[#1b1b1f]' },
+  // Açık tema ve koyu temanın üç tonu; küçük önizlemeler gerçek renklerle çizilir.
+  const options = [
+    { key: 'acik', label: 'Açık', rail: 'var(--tc-accent)', chat: '#ffffff', bar: 'rgba(0,0,0,0.15)', active: theme === 'light', pick: () => setPrefs({ theme: 'light' }) },
+    ...DARK_TONES.map((t) => ({
+      key: t.id,
+      label: t.label,
+      rail: t.rail,
+      chat: t.chat,
+      bar: 'rgba(255,255,255,0.2)',
+      active: theme === 'dark' && darkTone === t.id,
+      pick: () => setPrefs({ theme: 'dark', darkTone: t.id }),
+    })),
   ]
   return (
     <div className="space-y-8">
       <Section title="Tema">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-4 gap-3" role="radiogroup" aria-label="Tema">
           {options.map((o) => (
             <button
-              key={o.value}
+              key={o.key}
               type="button"
-              onClick={() => setPrefs({ theme: o.value })}
-              className={`overflow-hidden rounded-lg border-2 text-left transition-colors ${
-                theme === o.value ? 'border-accent' : 'border-line hover:border-faint'
-              }`}
+              role="radio"
+              aria-checked={o.active}
+              onClick={o.pick}
+              className={`overflow-hidden rounded-lg border-2 text-left transition-colors ${o.active ? 'border-accent' : 'border-line hover:border-faint'}`}
             >
-              <div className={`flex h-20 ${o.preview}`}>
-                <div className={`w-8 ${o.value === 'light' ? 'bg-accent' : 'bg-[#121214]'}`} />
-                <div className="flex-1 space-y-2 p-3">
+              <div className="flex h-16" style={{ background: o.chat }}>
+                <div className="w-6" style={{ background: o.rail }} />
+                <div className="flex-1 space-y-2 p-2.5">
                   <div className="h-2 w-2/3 rounded bg-accent/70" />
-                  <div className={`h-2 w-1/2 rounded ${o.value === 'light' ? 'bg-black/15' : 'bg-white/20'}`} />
+                  <div className="h-2 w-1/2 rounded" style={{ background: o.bar }} />
                 </div>
               </div>
               <p className="px-3 py-2 text-sm font-medium text-fg">{o.label}</p>
