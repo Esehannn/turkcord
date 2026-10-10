@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 64 64" role="img" aria-label="Turkcord">
+  <rect width="64" height="64" rx="16" fill="#e30a17"/>
+  <mask id="hilal">
+    <rect width="64" height="64" fill="#fff"/>
+    <circle cx="32.5" cy="31" r="13.6" fill="#000"/>
+  </mask>
+  <g fill="#fff">
+    <circle cx="27" cy="31" r="17" mask="url(#hilal)"/>
+    <path d="M14.5 40.5 L9 53 L23 45.8 Z"/>
+    <path d="M38.30 31.00 L43.15 29.30 L43.28 24.15 L46.40 28.24 L51.32 26.77 L48.40 31.00 L51.32 35.23 L46.40 33.76 L43.28 37.85 L43.15 32.70 Z"/>
+  </g>
+</svg>

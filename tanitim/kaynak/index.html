@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<title>Turkcord tanıtım görselleri</title>
+<!-- Görseller bu sayfadan üretilir: ?s=1 | 2 | 3 | logo | banner  (bkz. ../uret.ps1) -->
+<style>
+@font-face { font-family: 'Inter Variable'; font-weight: 100 900; src: url('../../node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2') format('woff2-variations'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Inter Variable'; font-weight: 100 900; src: url('../../node_modules/@fontsource-variable/inter/files/inter-latin-ext-wght-normal.woff2') format('woff2-variations'); unicode-range: U+0100-0130, U+0132-0151, U+0154-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1E00-1E9F, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: transparent; }
+body { font-family: 'Inter Variable', 'Segoe UI', sans-serif; -webkit-font-smoothing: antialiased; }
+svg { display: block; flex-shrink: 0; }
+
+/* ---- Uygulama penceresi maketi: renkler src/renderer/src/index.css ile aynı ---- */
+.win {
+  --tc-accent: #e30a17;
+  --tc-accent-soft: color-mix(in srgb, var(--tc-accent) 8%, white);
+  --tc-rail: var(--tc-accent); --tc-rail-item: rgba(255,255,255,.18); --tc-rail-text: #fff;
+  --tc-rail-active: #fff; --tc-rail-active-text: var(--tc-accent);
+  --tc-sidebar: #f4f4f5; --tc-chat: #fff; --tc-elevated: #fff; --tc-input: #efeff1;
+  --tc-hover: rgba(24,24,27,.05); --tc-selected: color-mix(in srgb, var(--tc-accent) 10%, transparent);
+  --tc-line: #e4e4e7; --tc-fg: #18181b; --tc-muted: #5f5f68; --tc-faint: #8e8e97;
+  --tc-mention: color-mix(in srgb, var(--tc-accent) 7%, transparent);
+  --tc-online: #23a55a; --tc-idle: #e6a01a; --tc-offline: #9a9aa3;
+  --tc-shadow: 0 10px 34px rgba(0,0,0,.14);
+  position: absolute; display: flex; flex-direction: column; overflow: hidden; border-radius: 10px;
+  font-size: 15px; color: var(--tc-fg); background: var(--tc-chat);
+  box-shadow: 0 40px 90px rgba(0,0,0,.38), 0 0 0 1px rgba(255,255,255,.16);
+}
+.win[data-theme='dark'] {
+  --tc-accent-soft: color-mix(in srgb, var(--tc-accent) 20%, transparent);
+  --tc-rail: #121214; --tc-rail-item: #26262b; --tc-rail-text: #f2f2f3;
+  --tc-rail-active: var(--tc-accent); --tc-rail-active-text: #fff;
+  --tc-sidebar: #1b1b1f; --tc-chat: #232328; --tc-elevated: #2b2b31; --tc-input: #18181c;
+  --tc-hover: rgba(255,255,255,.05); --tc-selected: color-mix(in srgb, var(--tc-accent) 22%, transparent);
+  --tc-line: #34343b; --tc-fg: #f2f2f3; --tc-muted: #a9a9b2; --tc-faint: #77777f;
+  --tc-mention: color-mix(in srgb, var(--tc-accent) 14%, transparent); --tc-offline: #6f6f78;
+  --tc-shadow: 0 10px 34px rgba(0,0,0,.5);
+}
+.win[data-accent='turuncu'] { --tc-accent: #d9540b; }
+.win[data-accent='yesil'] { --tc-accent: #1f8a4c; }
+.win[data-accent='turkuaz'] { --tc-accent: #0e8f9e; }
+.win[data-accent='lacivert'] { --tc-accent: #2456c9; }
+.win[data-accent='mor'] { --tc-accent: #7a3fd1; }
+
+.tb { height: 32px; display: flex; align-items: center; gap: 8px; padding-left: 12px; background: var(--tc-rail); color: var(--tc-rail-text); font-size: 12px; font-weight: 700; letter-spacing: .02em; }
+.tb .ctl { margin-left: auto; display: flex; }
+.tb .ctl span { width: 46px; height: 32px; display: grid; place-items: center; }
+.body { flex: 1; display: flex; min-height: 0; position: relative; }
+.rail { width: 72px; background: var(--tc-rail); display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px 0; }
+.ri { position: relative; width: 100%; display: flex; justify-content: center; }
+.ri b { width: 48px; height: 48px; border-radius: 24px; display: grid; place-items: center; background: var(--tc-rail-item); color: var(--tc-rail-text); font-size: 14px; font-weight: 700; }
+.ri.on b { border-radius: 16px; background: var(--tc-rail-active); color: var(--tc-rail-active-text); }
+.ri.on::before, .ri.un::before { content: ''; position: absolute; left: 0; top: 50%; width: 4px; height: 40px; margin-top: -20px; border-radius: 0 4px 4px 0; background: var(--tc-rail-text); }
+.ri.un::before { height: 8px; margin-top: -4px; }
+.ri i { position: absolute; right: 10px; bottom: 0; min-width: 20px; height: 20px; padding: 0 4px; border-radius: 10px; display: grid; place-items: center; font: 700 11px 'Inter Variable'; background: #fff; color: var(--tc-accent); box-shadow: 0 0 0 4px var(--tc-rail); }
+.win[data-theme='dark'] .ri i { background: var(--tc-accent); color: #fff; }
+.sep { width: 32px; height: 2px; border-radius: 2px; background: var(--tc-rail-item); }
+
+.side { width: 240px; background: var(--tc-sidebar); display: flex; flex-direction: column; position: relative; }
+.shead { height: 48px; display: flex; align-items: center; gap: 8px; padding: 0 12px; border-bottom: 1px solid var(--tc-line); font-weight: 600; }
+.shead .ic { width: 24px; height: 24px; border-radius: 8px; background: var(--tc-accent); color: #fff; font-size: 10px; font-weight: 700; display: grid; place-items: center; }
+.shead span { flex: 1; }
+.chs { flex: 1; padding: 12px 8px; display: flex; flex-direction: column; gap: 2px; }
+.gt { font-size: 12px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: var(--tc-faint); padding: 0 6px 4px; display: flex; justify-content: space-between; }
+.gt.s { margin-top: 14px; }
+.ch { display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 8px; border-radius: 6px; color: var(--tc-muted); font-size: 15px; font-weight: 500; }
+.ch.on { background: var(--tc-selected); color: var(--tc-fg); font-weight: 600; }
+.ch.un { color: var(--tc-fg); font-weight: 600; }
+.ch span { flex: 1; }
+.ch em { font-style: normal; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--tc-accent); color: #fff; font-size: 11px; font-weight: 700; display: grid; place-items: center; }
+.vp { display: flex; align-items: center; gap: 8px; margin-left: 24px; padding: 4px 6px; font-size: 14px; color: var(--tc-muted); }
+.vp span { flex: 1; }
+.vp.talk span { color: var(--tc-fg); font-weight: 600; }
+.vp.talk .av { box-shadow: 0 0 0 2px var(--tc-online), 0 0 0 4px color-mix(in srgb, var(--tc-online) 28%, transparent); }
+.vp small { font-size: 11px; font-weight: 600; color: var(--tc-online); }
+.vp .off { color: var(--tc-accent); }
+.av { border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 600; flex-shrink: 0; position: relative; }
+.av u { position: absolute; right: 0; bottom: 0; border-radius: 50%; background: var(--tc-online); box-shadow: 0 0 0 3px var(--tc-sidebar); }
+.av u.idle { background: var(--tc-idle); } .av u.off { background: var(--tc-offline); }
+
+.vpanel { border-top: 1px solid var(--tc-line); padding: 8px 12px; display: flex; align-items: center; gap: 4px; position: relative; }
+.vpanel .t { flex: 1; }
+.vpanel .t b { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; color: var(--tc-online); }
+.vpanel .t b small { font-size: 12px; font-weight: 500; }
+.vpanel .t span { font-size: 12px; color: var(--tc-muted); }
+.ib { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 6px; color: var(--tc-muted); }
+.ib.on { background: var(--tc-selected); color: var(--tc-fg); }
+.board { position: absolute; left: 8px; right: 8px; bottom: 100%; margin-bottom: 8px; padding: 8px; border-radius: 8px; border: 1px solid var(--tc-line); background: var(--tc-elevated); box-shadow: var(--tc-shadow); }
+.board p { font-size: 11px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: var(--tc-faint); padding: 0 4px 6px; }
+.board div { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.board div span { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 4px; border-radius: 6px; background: var(--tc-input); font-size: 11px; font-weight: 500; }
+.board div span.hit { background: var(--tc-selected); }
+.board div span i { font-style: normal; font-size: 20px; line-height: 1; }
+.upanel { height: 56px; border-top: 1px solid var(--tc-line); display: flex; align-items: center; gap: 4px; padding: 0 8px; }
+.upanel .n { flex: 1; min-width: 0; margin-left: 6px; line-height: 1.25; white-space: nowrap; }
+.upanel .n b { display: block; font-size: 14px; font-weight: 600; }
+.upanel .n span { font-size: 12px; color: var(--tc-muted); }
+
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--tc-chat); position: relative; }
+.mhead { height: 48px; display: flex; align-items: center; gap: 8px; padding: 0 16px; border-bottom: 1px solid var(--tc-line); font-weight: 600; color: var(--tc-fg); }
+.mhead .topic { font-weight: 400; font-size: 13px; color: var(--tc-muted); padding-left: 10px; margin-left: 4px; border-left: 1px solid var(--tc-line); flex: 1; }
+.mhead .ib { color: var(--tc-muted); }
+.msgs { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; padding-bottom: 12px; overflow: hidden; }
+.m { display: flex; gap: 12px; padding: 4px 16px; margin-top: 12px; border-left: 2px solid transparent; }
+.m.men { border-left-color: var(--tc-accent); background: var(--tc-mention); }
+.m .c { flex: 1; min-width: 0; line-height: 1.4; }
+.m .h { display: flex; align-items: baseline; gap: 8px; }
+.m .h b { font-weight: 600; }
+.m .h small { font-size: 12px; color: var(--tc-faint); }
+.m .tag { display: flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 500; color: var(--tc-accent); }
+.m .tag.f { color: var(--tc-faint); }
+.at { color: var(--tc-accent); background: var(--tc-selected); padding: 0 3px; border-radius: 4px; font-weight: 600; }
+.rx { display: flex; gap: 4px; margin-top: 5px; }
+.rx span { display: flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--tc-line); background: var(--tc-input); font-size: 14px; color: var(--tc-muted); }
+.rx span.me { border-color: var(--tc-accent); background: var(--tc-accent-soft); color: var(--tc-fg); }
+.rx b { font-size: 12px; font-weight: 600; }
+.poll { margin-top: 4px; max-width: 448px; padding: 12px; border-radius: 8px; border: 1px solid var(--tc-line); background: var(--tc-sidebar); }
+.poll .q { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.poll .q svg { color: var(--tc-accent); }
+.poll .o { position: relative; overflow: hidden; margin-top: 6px; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--tc-line); display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.poll .o:first-of-type { margin-top: 10px; }
+.poll .o::before { content: ''; position: absolute; inset: 0 auto 0 0; width: var(--w); background: var(--tc-hover); }
+.poll .o.me { border-color: var(--tc-accent); }
+.poll .o.me::before { background: var(--tc-accent-soft); }
+.poll .o > * { position: relative; }
+.poll .o span { flex: 1; }
+.poll .o svg { color: var(--tc-accent); }
+.poll .o small { font-size: 12px; font-weight: 600; color: var(--tc-muted); }
+.poll .tot { margin-top: 8px; font-size: 12px; color: var(--tc-faint); }
+.call { margin: 12px 16px 0; display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--tc-line); background: var(--tc-sidebar); font-size: 14px; }
+.call .ci { flex: none; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--tc-accent-soft); color: var(--tc-accent); }
+.call span { flex: 1; }
+.call small { font-size: 12px; color: var(--tc-faint); }
+.call em { font-style: normal; padding: 4px 10px; border-radius: 6px; background: var(--tc-accent); color: #fff; font-size: 12px; font-weight: 700; }
+.comp { margin: 0 16px 16px; height: 44px; border-radius: 10px; background: var(--tc-input); display: flex; align-items: center; gap: 10px; padding: 0 12px; color: var(--tc-faint); }
+.comp span { flex: 1; }
+.mem { width: 208px; background: var(--tc-sidebar); padding: 14px 8px; border-left: 1px solid var(--tc-line); }
+.mem .gt { margin-bottom: 4px; }
+.mem .p { display: flex; align-items: center; gap: 10px; padding: 5px 6px; font-size: 14px; font-weight: 500; }
+.mem .p small { display: block; font-size: 12px; font-weight: 400; color: var(--tc-muted); }
+.mem .p.dim { opacity: .5; }
+.note { position: absolute; top: 60px; right: 16px; width: 300px; display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 10px; border: 1px solid var(--tc-line); border-left: 3px solid var(--tc-online); background: var(--tc-elevated); box-shadow: var(--tc-shadow); }
+.note b { display: block; font-size: 14px; font-weight: 600; }
+.note span { font-size: 13px; color: var(--tc-muted); }
+.ovl { position: absolute; inset: 0; background: rgba(0,0,0,.55); display: flex; justify-content: center; padding-top: 70px; }
+.qs { width: min(512px, 88%); height: fit-content; border-radius: 12px; overflow: hidden; background: var(--tc-elevated); box-shadow: var(--tc-shadow); }
+.qs > p { padding: 12px 16px 0; font-size: 12px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: var(--tc-faint); }
+.qs .in { display: flex; align-items: center; gap: 8px; padding: 8px 16px; height: 56px; font-size: 16px; color: var(--tc-fg); }
+.qs .in svg { color: var(--tc-faint); }
+.qs .in i { width: 2px; height: 20px; background: var(--tc-accent); margin-left: -6px; }
+.qs .res { border-top: 1px solid var(--tc-line); padding: 6px; }
+.qs .r { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 6px; font-size: 14px; font-weight: 500; }
+.qs .r.on { background: var(--tc-selected); }
+.qs .r > svg { color: var(--tc-muted); margin: 0 3px; }
+.qs .r span { flex: 1; }
+.qs .r small { font-size: 12px; color: var(--tc-faint); font-weight: 400; }
+
+/* ---- Tanıtım sayfaları ---- */
+.page { position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+.copy { position: absolute; left: 96px; top: 0; bottom: 0; width: 620px; display: flex; flex-direction: column; justify-content: center; }
+.brand { display: flex; align-items: center; gap: 16px; font-size: 34px; font-weight: 800; letter-spacing: -.02em; margin-bottom: 56px; }
+h1 { font-size: 80px; line-height: 1.02; font-weight: 800; letter-spacing: -.035em; }
+.lead { margin-top: 32px; font-size: 29px; line-height: 1.4; font-weight: 450; max-width: 600px; }
+.chips { margin-top: 44px; display: flex; flex-wrap: wrap; gap: 12px; max-width: 600px; }
+.chips span { display: flex; align-items: center; gap: 10px; padding: 12px 20px; border-radius: 99px; font-size: 22px; font-weight: 600; }
+.moon { position: absolute; pointer-events: none; }
+
+.p1 { background: radial-gradient(1200px 900px at 78% 40%, #f4212e 0%, #e30a17 45%, #b60811 100%); color: #fff; }
+.p1 .lead { color: rgba(255,255,255,.9); }
+.p1 .chips span { background: rgba(255,255,255,.16); }
+.p2 { background: radial-gradient(1000px 800px at 80% 55%, #4a0a10 0%, #17090b 55%, #0c0c0e 100%); color: #f2f2f3; }
+.p2 h1 em, .p3 h1 em { font-style: normal; color: #e30a17; }
+.p2 .lead { color: #a9a9b2; }
+.p2 .chips span { background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.1); }
+.p3 { background: linear-gradient(135deg, #ffffff 0%, #f1f1f3 60%, #e6e6ea 100%); color: #18181b; }
+.p3 .lead { color: #5f5f68; }
+.p3 .win { box-shadow: 0 40px 90px rgba(24,24,27,.28), 0 0 0 1px rgba(24,24,27,.08); }
+.sw { margin-top: 44px; padding: 22px 24px; width: 560px; border-radius: 18px; background: #fff; box-shadow: 0 16px 44px rgba(24,24,27,.12), 0 0 0 1px rgba(24,24,27,.06); }
+.sw p { font-size: 15px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #8e8e97; margin-bottom: 16px; }
+.sw div { display: flex; justify-content: space-between; }
+.sw span { display: flex; flex-direction: column; align-items: center; gap: 10px; font-size: 16px; font-weight: 600; color: #5f5f68; }
+.sw span i { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; color: #fff; }
+.sw span.on { color: #18181b; }
+.sw span.on i { box-shadow: 0 0 0 4px #fff, 0 0 0 7px currentColor; }
+.keys { margin-top: 28px; display: flex; align-items: center; gap: 12px; font-size: 22px; font-weight: 500; color: #5f5f68; }
+kbd { font: 700 20px 'Inter Variable'; padding: 8px 14px; border-radius: 10px; background: #fff; color: #18181b; box-shadow: 0 2px 0 #c9c9cf, 0 0 0 1px #d9d9de; }
+
+.banner { width: 1500px; height: 500px; position: relative; overflow: hidden; color: #fff; background: radial-gradient(900px 600px at 30% 40%, #f4212e 0%, #e30a17 50%, #b60811 100%); }
+.banner .id { position: absolute; left: 96px; top: 0; bottom: 0; display: flex; flex-direction: column; justify-content: center; }
+.banner .row { display: flex; align-items: center; gap: 28px; }
+.banner .row b { font-size: 104px; font-weight: 800; letter-spacing: -.04em; line-height: 1; }
+.banner .id p { margin-top: 26px; font-size: 28px; font-weight: 500; color: rgba(255,255,255,.92); }
+.logo { width: 1024px; height: 1024px; }
+</style>
+</head>
+<body>
+<script>
+const q = new URLSearchParams(location.search).get('s') || '1'
+
+const STAR = 'M38.30 31.00 L43.15 29.30 L43.28 24.15 L46.40 28.24 L51.32 26.77 L48.40 31.00 L51.32 35.23 L46.40 33.76 L43.28 37.85 L43.15 32.70 Z'
+let logoN = 0
+// Logo: components/Logo.tsx ile aynı çizim. tile: zemin rengi; verilmezse yalnızca işaret çizilir.
+function logo(size, fg, tile, extra = '') {
+  const id = 'h' + ++logoN
+  return `<svg width="${size}" height="${size}" viewBox="0 0 64 64" ${extra}>
+    ${tile ? `<rect width="64" height="64" rx="16" fill="${tile}"/>` : ''}
+    <mask id="${id}"><rect width="64" height="64" fill="#fff"/><circle cx="32.5" cy="31" r="13.6" fill="#000"/></mask>
+    <g fill="${fg}"><circle cx="27" cy="31" r="17" mask="url(#${id})"/><path d="M14.5 40.5 L9 53 L23 45.8 Z"/><path d="${STAR}"/></g></svg>`
+}
+
+const ICONS = {
+  hash: '<path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18"/>',
+  volume: '<path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><path d="M16 9a5 5 0 0 1 0 6M19.364 18.364a9 9 0 0 0 0-12.728"/>',
+  mic: '<path d="M12 19v3M19 10v2a7 7 0 0 1-14 0v-2"/><rect x="9" y="2" width="6" height="13" rx="3"/>',
+  micoff: '<path d="M12 19v3M19 10v2a7 7 0 0 1-14 0v-2M3 3l18 18"/><rect x="9" y="2" width="6" height="13" rx="3"/>',
+  head: '<path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/>',
+  gear: '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
+  search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  pin: '<path d="M12 17v5M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/>',
+  plus: '<path d="M5 12h14M12 5v14"/>',
+  down: '<path d="m6 9 6 6 6-6"/>',
+  chart: '<path d="M3 3v16a2 2 0 0 0 2 2h16M18 17V9M13 17V5M8 17v-3"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  phone: '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>',
+  users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/><circle cx="9" cy="7" r="4"/>',
+  smile: '<circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01"/>',
+  signal: '<path d="M2 20h.01M7 20v-4M12 20v-8M17 20V8M22 4v16"/>',
+  horn: '<path d="m3 11 18-5v12L3 14v-3zM11.6 16.8a3 3 0 1 1-5.8-1.6"/>',
+  forward: '<path d="m15 17 5-5-5-5M4 18v-2a4 4 0 0 1 4-4h12"/>',
+  shield: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>',
+  bolt: '<path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>',
+}
+const ic = (n, s = 18) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[n]}</svg>`
+
+const PEOPLE = { Veli: '#1971c2', Nazlı: '#c2255c', Emre: '#2b8a3e', Ayşe: '#6741d9', Deniz: '#0c8599', Kaan: '#d9480f' }
+const av = (name, size, status) =>
+  `<div class="av" style="width:${size}px;height:${size}px;background:${PEOPLE[name]};font-size:${Math.max(10, size * 0.38)}px">${name[0]}${
+    status ? `<u class="${status}" style="width:${Math.max(10, Math.round(size * 0.32))}px;height:${Math.max(10, Math.round(size * 0.32))}px"></u>` : ''
+  }</div>`
+
+const msg = (name, time, body, cls = '') =>
+  `<div class="m ${cls}">${av(name, 40)}<div class="c"><div class="h"><b>${name}</b><small>${time}</small></div>${body}</div></div>`
+
+const MESSAGES = {
+  chat: [
+    msg('Nazlı', 'bugün 20:41', 'Bu akşam toplanıyor muyuz? 🎮'),
+    msg('Emre', 'bugün 20:42', 'Ben dokuz gibi gelirim. <span class="at">@Veli</span> sen de gel, eksik kalmayalım', 'men'),
+    msg('Ayşe', 'bugün 20:44', `<div class="poll"><div class="q">${ic('chart', 16)}Bu akşam ne yapıyoruz?</div>
+      <div class="o me" style="--w:50%">${ic('check', 14)}<span>Okey 101</span><small>3 · %50</small></div>
+      <div class="o" style="--w:33%"><span>Film gecesi</span><small>2 · %33</small></div>
+      <div class="o" style="--w:17%"><span>Tavla turnuvası</span><small>1 · %17</small></div>
+      <div class="tot">6 oy</div></div>`),
+    msg('Veli', 'bugün 20:47', `<div class="tag">${ic('pin', 12)}Sabitlendi</div>Kural belli: çayını almayan masaya oturamaz ☕
+      <div class="rx"><span class="me">😂 <b>4</b></span><span>❤️ <b>2</b></span><span>👍 <b>3</b></span></div>`),
+  ],
+  voice: [
+    msg('Emre', 'bugün 21:02', 'Kahvehane\'deyiz, gelen gelsin 🎧'),
+    `<div class="call"><span class="ci">${ic('phone', 16)}</span><span><b>Nazlı</b> seni aradı</span><small>bugün 21:05</small><em>Geri ara</em></div>`,
+    msg('Ayşe', 'bugün 21:08', `<div class="tag f">${ic('forward', 12)}İletildi</div>Bu akşamın çalma listesi hazır 🎶
+      <div class="rx"><span class="me">🔥 <b>3</b></span><span>👏 <b>2</b></span></div>`),
+    msg('Nazlı', 'bugün 21:11', 'Korna efektine basan kimse bulacağım onu 📯😂'),
+  ],
+}
+
+const EFFECTS = [['📯', 'Korna'], ['👏', 'Alkış'], ['🥁', 'Ba-dum-tıss'], ['🎺', 'Hüzün'], ['🏆', 'Zafer'], ['🔔', 'Ding']]
+
+// Uygulama penceresi. scene: 'chat' (üye listeli sohbet) | 'voice' (ses kanalı + efektler) | 'switch' (Ctrl+K)
+function app({ theme = 'light', accent = 'kirmizi', scene = 'chat', style = '' }) {
+  const voice = scene === 'voice'
+  const dark = theme === 'dark'
+  const mark = dark ? 'var(--tc-accent)' : '#fff'
+  return `<div class="win" data-theme="${theme}" data-accent="${accent}" style="${style}">
+    <div class="tb">${logo(18, 'currentColor')}Turkcord<div class="ctl"><span><svg width="10" height="10"><path d="M0 5h10" stroke="currentColor"/></svg></span><span><svg width="10" height="10"><rect x=".5" y=".5" width="9" height="9" fill="none" stroke="currentColor"/></svg></span><span><svg width="10" height="10"><path d="M0 0l10 10M10 0L0 10" stroke="currentColor"/></svg></span></div></div>
+    <div class="body">
+      <div class="rail">
+        <div class="ri"><b>${logo(36, 'currentColor')}</b><i>2</i></div><div class="sep"></div>
+        <div class="ri on"><b>BT</b></div><div class="ri un"><b>OK</b></div><div class="ri"><b>FG</b></div>
+        <div class="ri"><b>${ic('plus', 24)}</b></div>
+      </div>
+      <div class="side">
+        <div class="shead"><div class="ic">BT</div><span>Bizim Tayfa</span>${ic('down', 16)}</div>
+        <div class="chs">
+          <div class="gt">Yazı kanalları ${ic('plus', 14)}</div>
+          <div class="ch on">${ic('hash')}<span>genel</span></div>
+          <div class="ch un">${ic('hash')}<span>oyun-gecesi</span><em>3</em></div>
+          <div class="ch">${ic('hash')}<span>ekran-görüntüleri</span></div>
+          ${voice ? '' : `<div class="ch">${ic('hash')}<span>müzik</span></div>`}
+          <div class="gt s">Ses kanalları ${ic('plus', 14)}</div>
+          <div class="ch ${voice ? 'on' : ''}">${ic('volume')}<span>Kahvehane</span></div>
+          <div class="vp talk">${av('Nazlı', 22)}<span>Nazlı</span>${voice ? '<small>24 ms</small>' : ''}</div>
+          <div class="vp">${av('Emre', 22)}<span>Emre</span>${voice ? '<small>31 ms</small>' : ''}</div>
+          ${voice ? `<div class="vp">${av('Ayşe', 22)}<span>Ayşe</span><small>28 ms</small><b class="off">${ic('micoff', 14)}</b></div><div class="vp">${av('Veli', 22)}<span>Veli</span></div>` : ''}
+          ${voice ? '' : `<div class="ch">${ic('volume')}<span>Oyun Odası</span></div>`}
+        </div>
+        ${voice ? `<div class="vpanel">
+          <div class="board"><p>Ses efektleri</p><div>${EFFECTS.map(([e, l], i) => `<span class="${i === 0 ? 'hit' : ''}"><i>${e}</i>${l}</span>`).join('')}</div></div>
+          <div class="t"><b>${ic('signal', 16)}Ses bağlı <small>· 31 ms</small></b><span>Kahvehane / Bizim Tayfa</span></div>
+          <div class="ib on">${ic('horn')}</div><div class="ib">${ic('phone')}</div></div>` : ''}
+        <div class="upanel">${av('Veli', 34, 'on')}<div class="n"><b>Veli</b><span>${voice ? 'Çevrimiçi' : 'Çay molası'}</span></div>
+          <div class="ib">${ic('mic')}</div><div class="ib">${ic('head')}</div><div class="ib">${ic('gear')}</div></div>
+      </div>
+      <div class="main">
+        <div class="mhead">${ic('hash', 20)}genel<span class="topic">Her şey burada konuşulur</span><div class="ib">${ic('search')}</div><div class="ib">${ic('pin')}</div><div class="ib">${ic('users')}</div></div>
+        <div class="msgs">${MESSAGES[voice ? 'voice' : 'chat'].join('')}</div>
+        <div class="comp">${ic('plus', 20)}<span>#genel kanalına mesaj yaz</span>${ic('chart', 20)}${ic('smile', 20)}</div>
+        ${voice ? `<div class="note">${av('Deniz', 40)}<div><b>Deniz sesli kanalda</b><span>Kahvehane · Bizim Tayfa</span></div></div>` : ''}
+      </div>
+      ${scene === 'chat' ? `<div class="mem"><div class="gt">Çevrimiçi — 4</div>
+        <div class="p">${av('Veli', 32, 'on')}<div>Veli<small>Çay molası</small></div></div>
+        <div class="p">${av('Nazlı', 32, 'on')}<div>Nazlı</div></div>
+        <div class="p">${av('Emre', 32, 'idle')}<div>Emre<small>Yemekteyim</small></div></div>
+        <div class="p">${av('Ayşe', 32, 'on')}<div>Ayşe</div></div>
+        <div class="gt s">Çevrimdışı — 2</div>
+        <div class="p dim">${av('Deniz', 32, 'off')}<div>Deniz</div></div><div class="p dim">${av('Kaan', 32, 'off')}<div>Kaan</div></div></div>` : ''}
+      ${scene === 'switch' ? `<div class="ovl"><div class="qs"><p>Hızlı geçiş</p><div class="in">${ic('search', 20)}oyun<i></i></div><div class="res">
+        <div class="r on">${ic('hash')}<span>oyun-gecesi</span><small>Bizim Tayfa</small></div>
+        <div class="r">${ic('volume')}<span>Oyun Odası</span><small>Bizim Tayfa</small></div>
+        <div class="r">${av('Kaan', 24)}<span>Kaan</span><small>@oyuncukaan</small></div>
+        <div class="r">${ic('users')}<span>Okey Kulübü</span><small>Sunucu</small></div></div></div></div>` : ''}
+    </div></div>`
+}
+
+const place = (x, y, w, h, z, extra = '') => `left:${x / z}px;top:${y / z}px;width:${w / z}px;height:${h / z}px;zoom:${z};${extra}`
+const brand = (fg, tile) => `<div class="brand">${logo(60, fg, tile)}Turkcord</div>`
+const chips = (list) => `<div class="chips">${list.map(([i, t]) => `<span>${ic(i, 24)}${t}</span>`).join('')}</div>`
+
+const PAGES = {
+  1: () => `<div class="page p1">
+    ${logo(1500, 'rgba(255,255,255,.06)', '', 'class="moon" style="left:-420px;top:-240px"')}
+    <div class="copy">${brand('#e30a17', '#fff')}
+      <h1>Arkadaşlarınla,<br>kendi masanda.</h1>
+      <p class="lead">Sunucular, kanallar ve özel mesajlar. Yalnızca davet ettiklerin girer.</p>
+      ${chips([['chart', 'Anket'], ['pin', 'Sabitleme'], ['search', 'Arama'], ['forward', 'İletme']])}
+    </div>
+    ${app({ scene: 'chat', style: place(760, 140, 1090, 800, 1.15) })}
+  </div>`,
+  2: () => `<div class="page p2">
+    ${logo(1300, 'rgba(227,10,23,.07)', '', 'class="moon" style="right:-300px;top:-160px"')}
+    <div class="copy">${brand('#fff', '#e30a17')}
+      <h1>Sesin net,<br>bilgisayarın <em>rahat.</em></h1>
+      <p class="lead">Doğrudan bağlantılı sesli sohbet ve bireysel arama. Oyunun arkasında sessizce açık durur.</p>
+      ${chips([['bolt', 'Gürültü engelleme'], ['horn', 'Ses efektleri'], ['phone', 'Sesli arama'], ['signal', 'Ping göstergesi']])}
+    </div>
+    ${app({ theme: 'dark', scene: 'voice', style: place(760, 140, 1090, 800, 1.15) })}
+  </div>`,
+  3: () => `<div class="page p3">
+    <div class="copy">${brand('#fff', '#e30a17')}
+      <h1>Senin rengin,<br><em>senin düzenin.</em></h1>
+      <p class="lead">Altı vurgu rengi, açık ve koyu tema. Ctrl+K ile her yere tek hamlede geç.</p>
+      <div class="sw"><p>Vurgu rengi</p><div>${[['Kırmızı', '#e30a17'], ['Turuncu', '#d9540b'], ['Yeşil', '#1f8a4c'], ['Turkuaz', '#0e8f9e'], ['Lacivert', '#2456c9'], ['Mor', '#7a3fd1']]
+        .map(([l, c]) => `<span class="${l === 'Lacivert' ? 'on' : ''}" style="${l === 'Lacivert' ? `color:${c}` : ''}"><i style="background:${c}">${l === 'Lacivert' ? ic('check', 26) : ''}</i>${l}</span>`).join('')}</div></div>
+      <div class="keys"><kbd>Ctrl</kbd>+<kbd>K</kbd> Hızlı geçiş <kbd style="margin-left:14px">Ctrl</kbd>+<kbd>F</kbd> Arama</div>
+    </div>
+    ${app({ theme: 'dark', accent: 'mor', scene: 'none', style: place(1030, 90, 850, 600, 1) })}
+    ${app({ accent: 'lacivert', scene: 'switch', style: place(740, 330, 980, 660, 1.15) })}
+  </div>`,
+  banner: () => `<div class="banner">
+    ${logo(900, 'rgba(255,255,255,.07)', '', 'class="moon" style="left:-260px;top:-200px"')}
+    <div class="id"><div class="row">${logo(132, '#e30a17', '#fff')}<b>Turkcord</b></div>
+      <p>Arkadaşlar arası, davetle girilen sohbet uygulaması.</p></div>
+    ${app({ scene: 'chat', style: place(930, 70, 1000, 640, 1, 'transform:rotate(-3deg);transform-origin:top left') })}
+  </div>`,
+  logo: () => `<div class="logo">${logo(1024, '#fff', '#e30a17')}</div>`,
+  'logo-beyaz': () => `<div class="logo">${logo(1024, '#e30a17', '#fff')}</div>`,
+}
+// Adresteki değer işlev adı olarak kullanılmaz; yalnızca bilinen sayfalardan biri seçilir.
+function render(name) {
+  switch (name) {
+    case '2':
+      return PAGES[2]()
+    case '3':
+      return PAGES[3]()
+    case 'banner':
+      return PAGES.banner()
+    case 'logo':
+      return PAGES.logo()
+    case 'logo-beyaz':
+      return PAGES['logo-beyaz']()
+    default:
+      return PAGES[1]()
+  }
+}
+document.body.innerHTML = render(q)
+</script>
+</body>
+</html>
