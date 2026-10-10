@@ -368,8 +368,8 @@ const PAGES = {
 }
 // Adresteki değer yalnızca bilinen sayfalardan biriyse kullanılır.
 const pages = new Map(Object.entries(PAGES))
-const page = pages.get(q) ?? pages.get('1')
-document.body.innerHTML = page()
+const page = pages.get(q)
+document.body.innerHTML = typeof page === 'function' ? page() : PAGES[1]()
 </script>
 </body>
 </html>
