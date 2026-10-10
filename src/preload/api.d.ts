@@ -31,7 +31,12 @@ export interface TurkcordApi {
   requestAttention: () => void
   // Bildirime tıklanınca pencereyi öne getirir.
   showWindow: () => void
+  // Ekran paylaşımı: paylaşılabilecek ekran ve pencereler; seçilen kaynak bildirilince getDisplayMedia onu verir.
+  screenSources: () => Promise<ScreenSource[]>
+  pickScreen: (id: string, audio: boolean) => Promise<boolean>
 }
+
+export type ScreenSource = { id: string; name: string; screen: boolean; thumbnail: string }
 
 export type DesktopSettings = { closeToTray: boolean; openAtLogin: boolean }
 

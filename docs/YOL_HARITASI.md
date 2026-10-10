@@ -6,6 +6,7 @@
 |---|---|
 | Platform | Windows masaüstü (Electron + React + TypeScript) |
 | Sunucu | Supabase ücretsiz plan, Frankfurt |
+| Görüntü | Ekran paylaşımı ve kamera da P2P; ses bağlantısından ayrı, izleyen başına tek yönlü bağlantı. Kanalda aynı anda en fazla 2 ekran paylaşımı; kamerada sınır yok |
 | Ses | P2P WebRTC (ücretsiz). Bağlantı kurulumu Supabase Realtime ile, gerekirse Cloudflare TURN yedeği (ayda 1.000 GB ücretsiz) |
 | Kayıt | Sadece davet koduyla; giriş kullanıcı adı + şifre |
 | Tema | Kırmızı-beyaz (varsayılan açık), koyu tema seçeneği |
@@ -33,9 +34,12 @@
   "Ceddin Deden"in notalarından), ses odası görünümü ve seste geçen süre, süreli sessize alma, açılışta ayrı güncelleme
   penceresi, uygulamanın kendi ipuçları, koyu temaya "gece" ve "tam siyah" tonları, yeni profil kartı
 
+- [x] **9. Görüntü (0.7.0)**: ekran paylaşımı (ekran ya da pencere, 720p-1080p / 30-60 kare, isteğe bağlı bilgisayar sesi)
+  ve kamera; ses kanallarında ve bireysel aramalarda. Ses odasında ızgara / odak düzeni, tam ekran, küçük oynatıcı,
+  kanal listesinde "CANLI" rozeti, klavye kısayolları listesi (Ctrl+/)
+
 ## Sıradaki fikirler
 
-- Ekran paylaşımı (0.7.0'ın ana konusu): ses bağlantısına eklenen görüntü; varsayılan 720p / 30 kare
 
 - Sunucuya özel, yüklenebilen ses efektleri (şu an efektler uygulamayla gelen sabit bir set)
 - Grup aramaları (şu an arama iki kişi arasında; kalabalık için ses kanalları var)
@@ -51,4 +55,4 @@
 
 ## Bilinçli olarak dışarıda bırakılanlar
 
-Kamera, mobil uygulama, GIF arama (API anahtarı ister), bağlantı önizleme (ek sunucu ister).
+Mobil uygulama, GIF arama (API anahtarı ister), bağlantı önizleme (ek sunucu ister).

@@ -58,7 +58,11 @@ Bir güvenlik açığı bulursan lütfen herkese açık bir issue açma. GitHub'
 - Bağlantılar uygulama içinde açılmaz, varsayılan tarayıcıya gönderilir (sadece http/https).
 - Oturum anahtarları Windows'un kullanıcıya özel şifrelemesiyle (DPAPI) korunan bir dosyada saklanır.
 - Electron Fuses ile `RunAsNode` gibi kötüye kullanılabilecek özellikler kapatılır ve asar bütünlüğü doğrulanır.
-- Mikrofon dışında kamera, konum gibi izinler reddedilir.
+- Yalnızca mikrofon, kamera ve ekran paylaşımı izinleri verilir; konum gibi diğer izinler reddedilir.
+- Ekran yakalama yalnızca kullanıcının uygulamanın kendi seçim penceresinde seçtiği ekrana ya da pencereye verilir.
+  Seçim tek kullanımlıktır; seçim yapılmadan gelen yakalama isteği ana süreçte reddedilir.
+- Görüntü (kamera, ekran) sunucudan geçmez; izleyen kişiyle doğrudan (P2P) bağlantı üzerinden gider ve yalnızca
+  izlemek isteyen kişiye gönderilir.
 - Her yerde çalışan kısayollar sadece kullanıcının seçtiği tuş kombinasyonlarını dinler (tuş kaydı yapılmaz);
   ana süreç sadece `Ctrl/Alt/Shift + harf/rakam/F tuşu` biçimindeki kısayolları kabul eder.
 - Güncellemeler sadece bu reponun GitHub Releases sayfasından (HTTPS) indirilir; kurulumdan önce dosyanın SHA-512

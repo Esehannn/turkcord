@@ -43,6 +43,8 @@ export type Modal =
   | { kind: 'forward'; message: Pick<MessageRow, 'id' | 'content' | 'attachments'> }
   | { kind: 'create-poll'; channelId: string }
   | { kind: 'quick-switch' }
+  | { kind: 'share-screen' }
+  | { kind: 'shortcuts' }
   | null
 
 // Bir mesaja atlama isteği (arama sonucu, sabitlenmiş mesaj); ilgili sohbet bunu görünce mesajı bulup gösterir.

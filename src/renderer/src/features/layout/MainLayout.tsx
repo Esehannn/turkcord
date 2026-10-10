@@ -16,6 +16,7 @@ import { ModalHost } from './ModalHost'
 import { ServerRail } from './ServerRail'
 import { UserPanel } from './UserPanel'
 import { IncomingCall } from '@/features/voice/IncomingCall'
+import { MiniPlayer } from '@/features/voice/MiniPlayer'
 import { VoicePanel } from '@/features/voice/VoicePanel'
 import { VoiceStage } from '@/features/voice/VoiceStage'
 import { initCalls } from '@/voice/call'
@@ -67,15 +68,16 @@ export function MainLayout({ userId }: { userId: string }) {
   }, [muted, unread.data])
   useEffect(() => setUnreadBadge(badge), [badge])
 
-  // Ctrl+K: hızlı geçiş (sohbete ya da kanala atla).
+  // Ctrl+K: hızlı geçiş (sohbete ya da kanala atla). Ctrl+/: klavye kısayolları.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault()
-        const ui = useUi.getState()
-        if (ui.modal?.kind === 'quick-switch') ui.closeModal()
-        else if (!ui.modal) ui.openModal({ kind: 'quick-switch' })
-      }
+      if (!(e.ctrlKey || e.metaKey)) return
+      const kind = e.key.toLowerCase() === 'k' ? 'quick-switch' : e.key === '/' ? 'shortcuts' : null
+      if (!kind) return
+      e.preventDefault()
+      const ui = useUi.getState()
+      if (ui.modal?.kind === kind) ui.closeModal()
+      else if (!ui.modal) ui.openModal({ kind })
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -131,6 +133,7 @@ export function MainLayout({ userId }: { userId: string }) {
       </main>
       <ModalHost />
       <IncomingCall />
+      <MiniPlayer />
       <NotificationCards />
     </div>
   )

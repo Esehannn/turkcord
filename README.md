@@ -9,7 +9,7 @@
 ---
 
 Turkcord, küçük bir arkadaş grubu için yazılmış bir Windows masaüstü sohbet uygulamasıdır: sunucular, kanallar,
-özel mesajlar, sesli sohbet ve bireysel arama. Yalnızca davet kodu olanlar kayıt olabilir. Oyun oynarken arkada
+özel mesajlar, sesli ve görüntülü sohbet, ekran paylaşımı ve bireysel arama. Yalnızca davet kodu olanlar kayıt olabilir. Oyun oynarken arkada
 açık kalacağı için az RAM ve işlemci kullanması önceliklidir.
 
 Sunucu tarafında [Supabase](https://supabase.com) kullanır ve ücretsiz planla çalışacak şekilde tasarlanmıştır.
@@ -43,6 +43,8 @@ Sunucu tarafında [Supabase](https://supabase.com) kullanır ve ücretsiz planla
 | ✅ | "Yeni mesajlar" çizgisi, en alta in düğmesi, açık tema ve üç koyu ton (koyu, gece, tam siyah), altı vurgu rengi, yazı boyutu, sıkışık görünüm, kendi başlık çubuğu |
 | ✅ | Yönetici paneli: davet kodları, şifre sıfırlama, hesap askıya alma, depolama kullanımı ve temizlik |
 | ✅ | Ses odası: kanaldakiler büyük kartlarla, konuşan çerçevesi, ping ve seste geçen süre |
+| ✅ | Ekran paylaşımı: ekran ya da pencere, 720p-1080p ve 30-60 kare, isteğe bağlı bilgisayar sesi; izleyen "İzle"ye basınca gelir |
+| ✅ | Görüntülü sohbet: ses kanalında ve bireysel aramada kamera; tam ekran, odak düzeni, küçük oynatıcı |
 | ✅ | Sesli sohbet: P2P WebRTC, konuşan göstergesi, ping göstergesi, susturma/sağırlaştırma, kişi başı ses ayarı, cihaz seçimi |
 | ✅ | Bireysel sesli arama: özel mesajdan arama, mehter arama melodisi (ya da kendi ses dosyan), cevapsız arama kaydı |
 | ✅ | Ses efektleri: ses kanalında ya da aramada herkese çalan korna, alkış, ba-dum-tıss… |

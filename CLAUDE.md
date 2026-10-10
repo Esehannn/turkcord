@@ -27,6 +27,11 @@ Arayüz metinleri, kod yorumları ve commit mesajları Türkçe.
 - Alias (`@/`) kullanmayan saf yardımcılar (`lib/files.ts`, `lib/coalesce.ts`, `lib/format.ts`, `lib/markdown.ts`, `lib/search.ts`) `node --test` ile doğrudan test edilir;
   bu dosyalara alias'lı içe aktarım ekleme.
 - Bireysel aramalar ses kanallarıyla aynı motoru kullanır (`voice/engine.ts`, `serverId` null); çaldırma `calls` tablosundan geçer (`voice/call.ts`).
+- Görüntü (ekran paylaşımı, kamera) ses bağlantısından geçmez: `voice/video.ts` her izleyici için ayrı, tek yönlü bir bağlantı
+  kurar. Ses bağlantısını (`engine.ts`) görüntü için yeniden pazarlık ettirme; ses kopmaları buradan çıkar. Görüntü yalnızca
+  onu gösteren ekran açıkken izlenir (`useCameraFeeds`, "İzle" düğmesi).
+- Ekran yakalama kaynağını ana süreç verir (`main/capture.ts`): arayüz önce `pickScreen` ile seçimi bildirir, sonra
+  `getDisplayMedia` çağırır. Yerelde denerken `--use-fake-device-for-media-stream` ekran yakalamayı da sahtesiyle değiştirir.
 
 ## Arayüz
 

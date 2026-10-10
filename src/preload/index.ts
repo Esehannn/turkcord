@@ -45,6 +45,8 @@ const api: TurkcordApi = {
   setTheme: (theme, accent) => ipcRenderer.send('pencere:tema', theme, accent),
   requestAttention: () => ipcRenderer.send('pencere:dikkat'),
   showWindow: () => ipcRenderer.send('pencere:goster'),
+  screenSources: () => ipcRenderer.invoke('ekran:kaynaklar'),
+  pickScreen: (id, audio) => ipcRenderer.invoke('ekran:sec', id, audio),
 }
 
 contextBridge.exposeInMainWorld('turkcord', api)

@@ -2,7 +2,8 @@ import { create } from 'zustand'
 import type { EffectId } from '@/lib/sounds'
 
 // since: kanala girdiği an (ms, kendi saatine göre); eski sürümler bildirmez.
-export type VoiceParticipant = { userId: string; muted: boolean; deafened: boolean; since?: number }
+// screen / camera: ekranını paylaşıyor / kamerası açık (0.7.0 öncesi sürümler bildirmez).
+export type VoiceParticipant = { userId: string; muted: boolean; deafened: boolean; since?: number; screen?: boolean; camera?: boolean }
 export type VoiceStatus = 'idle' | 'connecting' | 'connected'
 // kapali: işlem yok, standart: tarayıcının gürültü engellemesi, guclu: yapay zekâ (RNNoise).
 export type NoiseMode = 'kapali' | 'standart' | 'guclu'
@@ -13,6 +14,7 @@ export type PeerLink = { ping: number | null; relay: boolean }
 type VoicePrefs = {
   inputDeviceId: string
   outputDeviceId: string
+  cameraDeviceId: string
   noiseMode: NoiseMode
   echoCancellation: boolean
   // Giriş hassasiyeti: otomatikse eşik kullanılmaz; değilse bu dB değerinin altı iletilmez.
@@ -42,6 +44,11 @@ type VoiceState = VoicePrefs & {
   links: Record<string, PeerLink>
   // Kanalda en son çalınan ses efekti (kimin bastığını göstermek için).
   lastEffect: { userId: string; id: EffectId; at: number } | null
+  // Benim paylaştıklarım (yoksa null).
+  localScreen: MediaStream | null
+  localCamera: MediaStream | null
+  // İzlediğim görüntüler: "kişi:tür" → akış. Anahtar varsa izleme istenmiştir; görüntü gelene kadar değer null'dır.
+  videos: Record<string, MediaStream | null>
   setPrefs: (prefs: Partial<VoicePrefs>) => void
 }
 
@@ -49,6 +56,7 @@ const PREFS_KEY = 'turkcord-ses-tercihleri'
 const PREF_KEYS = [
   'inputDeviceId',
   'outputDeviceId',
+  'cameraDeviceId',
   'noiseMode',
   'echoCancellation',
   'autoGate',
@@ -61,6 +69,7 @@ const PREF_KEYS = [
 const defaults: VoicePrefs = {
   inputDeviceId: 'default',
   outputDeviceId: 'default',
+  cameraDeviceId: 'default',
   noiseMode: 'guclu',
   echoCancellation: true,
   autoGate: true,
@@ -98,6 +107,9 @@ export const useVoice = create<VoiceState>((set, get) => ({
   peers: {},
   links: {},
   lastEffect: null,
+  localScreen: null,
+  localCamera: null,
+  videos: {},
   setPrefs: (prefs) => {
     set(prefs)
     const state = get()
