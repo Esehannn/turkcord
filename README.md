@@ -1,15 +1,28 @@
 <p align="center">
-  <img src="resources/icon.png" width="96" alt="Turkcord logosu" />
+  <img src="tanitim/banner.png" alt="Turkcord: arkadaşlar arası, davetle girilen sohbet uygulaması" />
 </p>
 
 <h1 align="center">Turkcord</h1>
 
-<p align="center">Arkadaşlar arası, davetle girilen, kırmızı-beyaz bir sohbet uygulaması.</p>
+<p align="center">Arkadaşlar arası, davetle girilen sohbet uygulaması.</p>
 
 ---
 
-Turkcord, Discord'un temel özelliklerini küçük bir arkadaş grubu için sunan bir Windows masaüstü uygulamasıdır.
+Turkcord, küçük bir arkadaş grubu için yazılmış bir Windows masaüstü sohbet uygulamasıdır: sunucular, kanallar,
+özel mesajlar, sesli sohbet ve bireysel arama. Yalnızca davet kodu olanlar kayıt olabilir. Oyun oynarken arkada
+açık kalacağı için az RAM ve işlemci kullanması önceliklidir.
+
 Sunucu tarafında [Supabase](https://supabase.com) kullanır ve ücretsiz planla çalışacak şekilde tasarlanmıştır.
+
+<p align="center">
+  <img src="tanitim/tanitim-1-sohbet.png" alt="Sohbet: kanallar, anket, sabitlenmiş mesaj ve etiketleme" />
+</p>
+<p align="center">
+  <img src="tanitim/tanitim-2-ses.png" width="49%" alt="Sesli sohbet: ses kanalı, ping, ses efektleri ve arama" />
+  <img src="tanitim/tanitim-3-gorunum.png" width="49%" alt="Görünüm: altı vurgu rengi, açık ve koyu tema, hızlı geçiş" />
+</p>
+
+<sub>Görseller uygulamanın renkleri ve yerleşimiyle çizilmiş tanıtım maketleridir; `tanitim/uret.ps1` ile yeniden üretilir.</sub>
 
 ## Özellikler
 
@@ -24,8 +37,10 @@ Sunucu tarafında [Supabase](https://supabase.com) kullanır ve ücretsiz planla
 | ✅ | Yazı kanalları: anlık mesajlar, yanıtlama, düzenleme, silme, kopyalama, emoji tepkileri |
 | ✅ | Dosya gönderme: görsel, ses, video ve her tür dosya (25 MB'a kadar), sürükle-bırak, yükleme ilerlemesi |
 | ✅ | Biçimlendirme (**kalın**, *italik*, `kod`, spoiler), otomatik tamamlamalı @etiketleme, "yazıyor…" göstergesi |
+| ✅ | Sohbette arama (Ctrl+F), sabitlenmiş mesajlar, anket, mesaj iletme, özel mesajda "Görüldü" |
+| ✅ | Hızlı geçiş (Ctrl+K), kanal / sunucu / özel mesaj sessize alma, sesli kanala giriş bildirimi |
 | ✅ | Bildirimler: ayarlanabilir sesler, uygulama içi bildirim kartları, masaüstü bildirimleri, okunmamış rozetleri |
-| ✅ | "Yeni mesajlar" çizgisi, en alta in düğmesi, açık ve koyu tema, kendi başlık çubuğu |
+| ✅ | "Yeni mesajlar" çizgisi, en alta in düğmesi, açık ve koyu tema, altı vurgu rengi, yazı boyutu, sıkışık görünüm, kendi başlık çubuğu |
 | ✅ | Yönetici paneli: davet kodları, şifre sıfırlama, hesap askıya alma, depolama kullanımı ve temizlik |
 | ✅ | Sesli sohbet: P2P WebRTC, konuşan göstergesi, ping göstergesi, susturma/sağırlaştırma, kişi başı ses ayarı, cihaz seçimi |
 | ✅ | Bireysel sesli arama: özel mesajdan arama, mehter arama melodisi (ya da kendi ses dosyan), cevapsız arama kaydı |
