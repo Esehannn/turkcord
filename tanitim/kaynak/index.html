@@ -366,10 +366,24 @@ const PAGES = {
   logo: () => `<div class="logo">${logo(1024, '#fff', '#e30a17')}</div>`,
   'logo-beyaz': () => `<div class="logo">${logo(1024, '#e30a17', '#fff')}</div>`,
 }
-// Adresteki değer yalnızca bilinen sayfalardan biriyse kullanılır.
-const pages = new Map(Object.entries(PAGES))
-const page = pages.get(q)
-document.body.innerHTML = typeof page === 'function' ? page() : PAGES[1]()
+// Adresteki değer işlev adı olarak kullanılmaz; yalnızca bilinen sayfalardan biri seçilir.
+function render(name) {
+  switch (name) {
+    case '2':
+      return PAGES[2]()
+    case '3':
+      return PAGES[3]()
+    case 'banner':
+      return PAGES.banner()
+    case 'logo':
+      return PAGES.logo()
+    case 'logo-beyaz':
+      return PAGES['logo-beyaz']()
+    default:
+      return PAGES[1]()
+  }
+}
+document.body.innerHTML = render(q)
 </script>
 </body>
 </html>
