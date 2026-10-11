@@ -414,22 +414,16 @@ select tests.topic('online');
 set role authenticated;
 select tests.ok((select count(*) = 1 from realtime.messages where topic = realtime.topic()), 'giriş yapan herkes çevrimiçi listesini görebilir');
 
--- Ses sinyalleri
+-- Eski ortak ses konusu ("ses:{kanal}", 0.7.0 ve öncesi) kapalı: üye bile dinleyemez, yazamaz
 reset role;
 insert into realtime.messages (topic, extension, payload) values ('ses:' || :'ses_id', 'broadcast', '{"t":"teklif"}');
 select tests.login(:'veli');
 select tests.topic('ses:' || :'ses_id');
 set role authenticated;
-select tests.ok((select count(*) = 1 from realtime.messages where topic = realtime.topic()), 'üye ses sinyallerini alabilir');
-insert into realtime.messages (topic, extension) values ('ses:' || :'ses_id', 'broadcast');
-
-reset role;
-select tests.login(:'mehmet');
-set role authenticated;
-select tests.ok((select count(*) = 0 from realtime.messages where topic = realtime.topic()), 'üye olmayan ses sinyallerini alamaz');
+select tests.ok((select count(*) = 0 from realtime.messages where topic = realtime.topic()), 'eski ses konusu üye için de kapalı');
 select tests.fails(
   format('insert into realtime.messages (topic, extension) values (%L, %L)', 'ses:' || :'ses_id', 'broadcast'),
-  'üye olmayan ses sinyali gönderemez', 'row-level security');
+  'eski ses konusuna üye de sinyal gönderemez', 'row-level security');
 
 -- Kimliği doğrulanan sinyal konuları ("sinyal:{kanal}:{kullanıcı}"): herkes yalnızca kendi konusuna yazar
 reset role;
