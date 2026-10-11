@@ -40,5 +40,8 @@
   "dependencies": {
     "@sapphi-red/web-noise-suppressor": "0.4.1",
     "electron-updater": "6.8.10"
+  },
+  "overrides": {
+    "global-agent": "^4.1.3"
   }
 }
