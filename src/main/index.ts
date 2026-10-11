@@ -7,8 +7,10 @@ import { registerWindowIpc, titleBarOverlay } from './windowIpc'
 import { setupUpdater } from './updater'
 import { isSafeExternalUrl, isTrustedUrl } from './security'
 
-const APP_ID = 'com.turkcord.app'
 const isDev = !app.isPackaged
+// Geliştirmede ayrı kimlik: Electron bildirimler için Başlat menüsüne "Electron" kısayolu açar; kimlik kurulu
+// uygulamayla aynı olursa Windows görev çubuğunda kurulu uygulamayı da Electron simgesiyle gösterir.
+const APP_ID = isDev ? 'com.turkcord.app.gelistirme' : 'com.turkcord.app'
 
 // Aynı anda tek pencere: ikinci kez açılınca mevcut pencere öne gelir.
 if (!app.requestSingleInstanceLock()) {
