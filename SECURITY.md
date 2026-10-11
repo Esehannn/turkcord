@@ -48,9 +48,8 @@ Bir güvenlik açığı bulursan lütfen herkese açık bir issue açma. GitHub'
 - Bilinen sınır: katılımcı listesi (presence) kişinin kendi bildirdiği kimliğe dayanır. Kanala erişimi olan biri,
   değiştirilmiş bir istemciyle listede başka bir üye gibi görünebilir; ama o üyenin konusuna yazamadığı için onun
   adına bağlantı kuramaz, yani bu yolla ses ya da görüntü alamaz.
-- 0.7.0 ve öncesi sürümler eski düzeni kullanır (doğrudan bağlantı, ortak sinyal konusu) ve bu korumaların hiçbirine
-  sahip değildir; güncel sürümdekilerle sesli konuşamazlar. Eski düzenin veritabanı yetkisi, herkes güncelleyince
-  kaldırılır.
+- 0.7.0 ve öncesi sürümler eski düzeni kullanırdı (doğrudan bağlantı, ortak sinyal konusu). O konunun veritabanı
+  yetkisi kaldırıldı: bu sürümler, uygulama değiştirilse bile, sesli sohbete bağlanamaz.
 - İsteğe bağlı asgari sürüm (`MIN_APP_VERSION`): sunucu, daha eski sürüme aktarma bilgisi vermez ve uygulama
   güncelleme ister. Sürümü uygulama kendi bildirdiği için bu, değiştirilmiş bir istemciye karşı koruma değildir;
   güncellemeyi erteleyen kullanıcıyı günceller.
