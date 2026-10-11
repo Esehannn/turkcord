@@ -313,7 +313,13 @@ function StageTile({
         {kind === 'person' && p.deafened && <HeadphoneOff className="size-3.5 shrink-0 text-accent" aria-label="Sağırlaştırılmış" />}
         {!compact && kind === 'person' && (
           <span className={`pointer-events-auto ml-auto flex shrink-0 items-center gap-2 text-xs ${onVideo ? 'text-white/80' : 'text-muted'}`}>
-            {waiting ? 'Bağlanıyor…' : p.since !== undefined && <Elapsed since={p.since} className="tabular-nums" />}
+            {inRoom && !mine && p.legacy ? (
+              <span data-tip="Birbirinizi duyabilmeniz için Turkcord'u güncellemesi gerekiyor.">Eski sürüm</span>
+            ) : waiting ? (
+              'Bağlanıyor…'
+            ) : (
+              p.since !== undefined && <Elapsed since={p.since} className="tabular-nums" />
+            )}
             {inRoom && !mine && !waiting && <PingBadge link={link} />}
           </span>
         )}

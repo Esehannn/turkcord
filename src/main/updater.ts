@@ -98,6 +98,13 @@ export function setupUpdater(getWindow: () => BrowserWindow | null, interactive:
   })
 
   const check = () => void autoUpdater.checkForUpdates().catch(() => {})
+  // Arayüz beklemeden denetim isteyebilir (ör. sunucu bu sürümü artık desteklemiyorsa); en fazla 10 dakikada bir.
+  let lastAsked = 0
+  ipcMain.on('guncelleme:denetle', (event) => {
+    if (!isTrustedSender(event) || Date.now() - lastAsked < 10 * 60 * 1000) return
+    lastAsked = Date.now()
+    check()
+  })
   if (starting) checkTimer = setTimeout(finishStartup, CHECK_TIMEOUT_MS)
   check()
   setInterval(check, CHECK_EVERY_MS)

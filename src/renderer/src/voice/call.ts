@@ -10,7 +10,7 @@ import { useVoice } from './store'
 
 // Bireysel arama: özel mesajdaki iki kişi arasında sesli görüşme.
 // Çaldırma "calls" tablosundan geçer (iki taraf da değişiklik akışından haberdar olur); ses, ses
-// kanallarıyla aynı motorla doğrudan (P2P) akar. Arayan hemen odaya girer, aranan açınca bağlanılır.
+// kanallarıyla aynı motorla (Cloudflare aktarma sunucusu üzerinden) akar. Arayan hemen odaya girer, aranan açınca bağlanılır.
 
 export type ActiveCall = {
   id: string

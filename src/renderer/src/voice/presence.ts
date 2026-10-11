@@ -15,7 +15,11 @@ import { useVoice, type VoiceParticipant } from './store'
 
 export type VoiceFlags = { muted: boolean; deafened: boolean; screen?: boolean; camera?: boolean; at: number }
 // since: kanala giriş anı; "seste geçen süre" bundan hesaplanır.
-type Meta = Partial<VoiceFlags> & { since?: number }
+// v: sinyal düzeninin sürümü. 0.7.0 ve öncesi bildirmez; onlar eski düzeni (ortak "ses:{kanal}" konusu) kullanır.
+type Meta = Partial<VoiceFlags> & { since?: number; v?: number }
+
+// 2: herkes yalnızca kendi konusuna yazar ("sinyal:{kanal}:{kullanıcı}", bkz. engine.ts).
+const SIGNAL_VERSION = 2
 
 const TRACK_EVERY_MS = 12_000
 const MAX_REVIVES = 5
@@ -49,6 +53,7 @@ function publish(channelId: string, entry: Entry): void {
       screen: best.screen === true,
       camera: best.camera === true,
       since: typeof meta.since === 'number' ? meta.since : undefined,
+      legacy: meta.v !== SIGNAL_VERSION ? true : undefined,
     }
   })
   useVoice.setState((s) => ({ rooms: { ...s.rooms, [channelId]: list } }))
@@ -100,7 +105,7 @@ function ensure(channelId: string, userId: string, dm: boolean): Entry {
     dm,
     meta: null,
     pacer: coalesce(async () => {
-      if (entry.meta && entries.get(channelId) === entry) await channel.track({ ...entry.meta })
+      if (entry.meta && entries.get(channelId) === entry) await channel.track({ ...entry.meta, v: SIGNAL_VERSION })
     }, TRACK_EVERY_MS),
     revived: 0,
     present: new Map(),

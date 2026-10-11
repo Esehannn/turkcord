@@ -18,8 +18,7 @@ Sunucu tarafında [Supabase](https://supabase.com) kullanır ve ücretsiz planla
   <img src="tanitim/tanitim-1-sohbet.png" alt="Sohbet: kanallar, anket, sabitlenmiş mesaj ve etiketleme" />
 </p>
 <p align="center">
-  <img src="tanitim/tanitim-2-ses.png" width="49%" alt="Sesli sohbet: ses kanalı, ping, ses efektleri ve arama" />
-  <img src="tanitim/tanitim-3-gorunum.png" width="49%" alt="Görünüm: altı vurgu rengi, açık ve koyu tema, hızlı geçiş" />
+  <img src="tanitim/tanitim-3-gorunum.png" alt="Görünüm: altı vurgu rengi, açık ve koyu tema, hızlı geçiş" />
 </p>
 
 <sub>Görseller uygulamanın renkleri ve yerleşimiyle çizilmiş tanıtım maketleridir; `tanitim/uret.ps1` ile yeniden üretilir.</sub>
@@ -45,7 +44,7 @@ Sunucu tarafında [Supabase](https://supabase.com) kullanır ve ücretsiz planla
 | ✅ | Ses odası: kanaldakiler büyük kartlarla, konuşan çerçevesi, ping ve seste geçen süre |
 | ✅ | Ekran paylaşımı: ekran ya da pencere, 720p-1080p ve 30-60 kare, isteğe bağlı bilgisayar sesi; izleyen "İzle"ye basınca gelir |
 | ✅ | Görüntülü sohbet: ses kanalında ve bireysel aramada kamera; tam ekran, odak düzeni, küçük oynatıcı |
-| ✅ | Sesli sohbet: P2P WebRTC, konuşan göstergesi, ping göstergesi, susturma/sağırlaştırma, kişi başı ses ayarı, cihaz seçimi |
+| ✅ | Sesli sohbet: uçtan uca şifreli WebRTC, yalnızca Cloudflare üzerinden (IP adresin karşıya görünmez), konuşan göstergesi, ping göstergesi, susturma/sağırlaştırma, kişi başı ses ayarı, cihaz seçimi |
 | ✅ | Bireysel sesli arama: özel mesajdan arama, mehter arama melodisi (ya da kendi ses dosyan), cevapsız arama kaydı |
 | ✅ | Ses efektleri: ses kanalında ya da aramada herkese çalan korna, alkış, ba-dum-tıss… |
 | ✅ | Yapay zekâ gürültü engelleme (RNNoise), giriş hassasiyeti, yankı engelleme, bas-konuş |

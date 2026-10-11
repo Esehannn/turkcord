@@ -6,7 +6,7 @@ export function pingClass(ping: number): string {
 }
 
 export function linkTitle(link: PeerLink): string {
-  const via = link.relay ? 'Cloudflare aktarma sunucusu üzerinden' : 'Doğrudan bağlantı'
+  const via = 'Cloudflare aktarma sunucusu üzerinden'
   return link.ping !== null ? `${via}, gecikme ${link.ping} ms` : via
 }
 

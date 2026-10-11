@@ -15,6 +15,8 @@ export interface TurkcordApi {
   updateReady: () => Promise<string | null>
   onUpdateReady: (callback: (version: string) => void) => () => void
   installUpdate: () => Promise<void>
+  // Beklemeden yeni sürüm denetimi ister (çalışırken 4 saatte bir kendiliğinden de bakılır).
+  checkForUpdate: () => void
   // Açılıştaki güncelleme penceresi: denetimin aşaması (denetleniyor, indiriliyor, hazır…) ve "şimdilik atla".
   updateStage: () => Promise<UpdateStage | null>
   onUpdateStage: (callback: (stage: UpdateStage) => void) => () => void

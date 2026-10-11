@@ -1,11 +1,18 @@
 // Sesli sohbet için ICE sunucuları.
-// Cloudflare TURN anahtarı tanımlıysa kısa ömürlü TURN bilgisi üretir (doğrudan bağlantı kurulamayan
-// hatlar için yedek). Tanımlı değilse sadece ücretsiz STUN sunucularını döner.
+// Ses ve görüntü yalnızca Cloudflare'in aktarma (TURN) sunucusundan geçer; bu fonksiyon onun kısa ömürlü
+// kimlik bilgisini üretir. Üretilemezse (anahtar tanımlı değil, istek sınırı, Cloudflare hatası) boş liste
+// döner ve uygulama bağlanmaz; başka bir sunucuya ya da doğrudan bağlantıya geri dönülmez.
 // Gizli bilgiler Supabase > Edge Functions > Secrets: CLOUDFLARE_TURN_KEY_ID, CLOUDFLARE_TURN_API_TOKEN
-import { adminClient, corsHeaders, json, withinRateLimit } from '../_shared/http.ts'
+//
+// Asgari sürüm (isteğe bağlı gizli ayar MIN_APP_VERSION, ör. "0.8.0"): daha eski ya da sürümünü bildirmeyen
+// uygulamaya aktarma bilgisi verilmez ve güncellemesi istenir. Sürümü uygulama kendi bildirdiği için bu,
+// değiştirilmiş bir istemciyi durdurmaz; güncellemeyi erteleyen kullanıcıyı günceller.
+import { adminClient, corsHeaders, json, readJson, withinRateLimit } from '../_shared/http.ts'
+import { versionAtLeast } from '../_shared/version.ts'
 
-const STUN = [{ urls: ['stun:stun.cloudflare.com:3478', 'stun:stun.l.google.com:19302'] }]
-const TTL_SECONDS = 12 * 60 * 60
+const NONE = { iceServers: [], turn: false }
+// Uygulama bilgiyi saatte bir yeniler; süre, kanalda kesintisiz geçebilecek en uzun vakitten uzun olmalı.
+const TTL_SECONDS = 24 * 60 * 60
 
 type IceServer = { urls: string | string[]; username?: string; credential?: string }
 
@@ -19,13 +26,16 @@ Deno.serve(async (req) => {
   const { data: auth, error: authError } = await admin.auth.getUser(token)
   if (authError || !auth.user) return json(401, { error: 'unauthorized' })
 
+  const minVersion = Deno.env.get('MIN_APP_VERSION')
+  if (minVersion && !versionAtLeast((await readJson(req))?.version, minVersion)) return json(200, { ...NONE, update: true })
+
   const keyId = Deno.env.get('CLOUDFLARE_TURN_KEY_ID')
   const apiToken = Deno.env.get('CLOUDFLARE_TURN_API_TOKEN')
-  if (!keyId || !apiToken) return json(200, { iceServers: STUN, turn: false })
+  if (!keyId || !apiToken) return json(200, NONE)
 
   // Ücretsiz kotayı korumak için kişi başı saatte 30 istek.
   if (!(await withinRateLimit(admin, `turn:${auth.user.id}`, 30, 3600))) {
-    return json(200, { iceServers: STUN, turn: false })
+    return json(200, NONE)
   }
 
   try {
@@ -36,17 +46,18 @@ Deno.serve(async (req) => {
     })
     if (!res.ok) {
       console.error('cloudflare turn', res.status)
-      return json(200, { iceServers: STUN, turn: false })
+      return json(200, NONE)
     }
     const data = (await res.json()) as { iceServers?: IceServer | IceServer[] }
     const list = Array.isArray(data.iceServers) ? data.iceServers : data.iceServers ? [data.iceServers] : []
     // 53 numaralı port tarayıcılarda engelli; o adresler sadece zaman aşımına yol açar.
+    // Yalnızca TURN adresleri: STUN'un tek işi kişinin kendi adresini öğrenip karşıya bildirmesidir.
     const iceServers = list
-      .map((s) => ({ ...s, urls: (Array.isArray(s.urls) ? s.urls : [s.urls]).filter((u) => !/:53(\?|$)/.test(u)) }))
+      .map((s) => ({ ...s, urls: (Array.isArray(s.urls) ? s.urls : [s.urls]).filter((u) => /^turns?:/i.test(u) && !/:53(\?|$)/.test(u)) }))
       .filter((s) => s.urls.length > 0)
-    return json(200, { iceServers: iceServers.length ? iceServers : STUN, turn: iceServers.length > 0 })
+    return json(200, { iceServers, turn: iceServers.length > 0 })
   } catch (error) {
     console.error('cloudflare turn', error)
-    return json(200, { iceServers: STUN, turn: false })
+    return json(200, NONE)
   }
 })
