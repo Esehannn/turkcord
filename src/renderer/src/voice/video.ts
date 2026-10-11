@@ -3,12 +3,16 @@ import { useVoice } from './store'
 
 // Görüntü (ekran paylaşımı ve kamera). Ses bağlantısına dokunmaz: her görüntü, onu izleyen her kişi için ayrı ve
 // tek yönlü bir WebRTC bağlantısından gider. Böylece yayın ya da kamera açılıp kapanırken ses kopmaz ve
-// izlemeyene hiç veri gönderilmez.
+// izlemeyene hiç veri gönderilmez. Bu bağlantılar da ses gibi yalnızca Cloudflare aktarma sunucusundan geçer.
 //
 // Akış: izleyen "izle" der → yayıncı o kişi için bağlantı kurup "teklif" gönderir → izleyen "cevap" verir.
 // İzleyen vazgeçince "birak", yayıncı yayını bitirince "bitti" gönderir. Kimin ne paylaştığı ses durumu ile
 // birlikte (presence + "durum" yayını) duyurulur; bu sinyaller yalnızca bağlantıyı kurmak içindir.
-// Sinyaller ses kanalının yayın kanalından ("ses:{kanal}", olay "goruntu") gider; motoru engine.ts bağlar.
+// Sinyaller ses sinyalleriyle aynı yoldan (herkesin kendi konusu, olay "goruntu") gider; motoru engine.ts bağlar.
+// Sinyalin kimden geldiğini konu belirler (sunucu doğrular), mesajın içinde gönderen yazmaz.
+//
+// Görüntü yalnızca kanalda görünen (katılımcı listesindeki) kişiye gönderilir: listede olmayan birinin sinyali
+// işlenmez.
 
 export type VideoKind = 'screen' | 'camera'
 export type ScreenQuality = '720p30' | '1080p30' | '720p60' | '1080p60'
@@ -34,14 +38,15 @@ const CAMERA = { width: 960, height: 540, fps: 30, bitrate: 900_000 }
 const RETRY_MS = 6000
 
 type Signal =
-  | { type: 'izle' | 'birak'; from: string; to: string; kind: VideoKind }
-  | { type: 'teklif' | 'cevap'; from: string; to: string; kind: VideoKind; sdp: string }
+  | { type: 'izle' | 'birak'; to: string; kind: VideoKind }
+  | { type: 'teklif' | 'cevap'; to: string; kind: VideoKind; sdp: string }
   // rol: adayı gönderenin o bağlantıdaki rolü.
-  | { type: 'aday'; from: string; to: string; kind: VideoKind; rol: 'yayinci' | 'izleyici'; candidate: RTCIceCandidateInit }
-  | { type: 'bitti'; from: string; kind: VideoKind }
+  | { type: 'aday'; to: string; kind: VideoKind; rol: 'yayinci' | 'izleyici'; candidate: RTCIceCandidateInit }
+  | { type: 'bitti'; kind: VideoKind }
 
 type Link = { pc: RTCPeerConnection; pending: RTCIceCandidateInit[] }
-type Wiring = { me: string; send: (payload: unknown) => void; iceServers: () => RTCIceServer[]; onLocalChange: () => void }
+// rtc: bağlantı ayarı; sesle aynı, yani görüntü de yalnızca aktarma sunucusundan geçer (bkz. ice.ts).
+type Wiring = { me: string; send: (payload: unknown) => void; rtc: () => RTCConfiguration; onLocalChange: () => void }
 
 let wiring: Wiring | null = null
 // Benim gönderdiklerim: `${izleyen}:${tür}` → bağlantı. Benim izlediklerim: `${yayıncı}:${tür}` → bağlantı.
@@ -90,7 +95,7 @@ async function serve(viewer: string, kind: VideoKind): Promise<void> {
   if (!wiring || !stream) return
   const key = videoKey(viewer, kind)
   closeLink(outgoing, key)
-  const pc = new RTCPeerConnection({ iceServers: wiring.iceServers() })
+  const pc = new RTCPeerConnection(wiring.rtc())
   const link: Link = { pc, pending: [] }
   outgoing.set(key, link)
 
@@ -105,7 +110,7 @@ async function serve(viewer: string, kind: VideoKind): Promise<void> {
     })
   }
   pc.onicecandidate = (event) => {
-    if (event.candidate) send({ type: 'aday', from: wiring!.me, to: viewer, kind, rol: 'yayinci', candidate: event.candidate.toJSON() })
+    if (event.candidate) send({ type: 'aday', to: viewer, kind, rol: 'yayinci', candidate: event.candidate.toJSON() })
   }
   pc.onconnectionstatechange = () => {
     // İzleyici koptuysa bağlantı bırakılır; hâlâ izlemek istiyorsa yeniden "izle" der.
@@ -113,7 +118,7 @@ async function serve(viewer: string, kind: VideoKind): Promise<void> {
   }
   const offer = await pc.createOffer()
   await pc.setLocalDescription(offer)
-  if (outgoing.get(key) === link) send({ type: 'teklif', from: wiring.me, to: viewer, kind, sdp: offer.sdp ?? '' })
+  if (outgoing.get(key) === link) send({ type: 'teklif', to: viewer, kind, sdp: offer.sdp ?? '' })
 }
 
 function stopLocal(kind: VideoKind, announce = true): void {
@@ -126,7 +131,7 @@ function stopLocal(kind: VideoKind, announce = true): void {
   for (const key of [...outgoing.keys()]) if (key.endsWith(`:${kind}`)) closeLink(outgoing, key)
   useVoice.setState(kind === 'screen' ? { localScreen: null } : { localCamera: null })
   if (announce && wiring) {
-    send({ type: 'bitti', from: wiring.me, kind })
+    send({ type: 'bitti', kind })
     wiring.onLocalChange()
   }
 }
@@ -232,13 +237,13 @@ const pendingRetries = new Map<string, ReturnType<typeof setTimeout>>()
 function request(userId: string, kind: VideoKind): void {
   if (!wiring) return
   const key = videoKey(userId, kind)
-  send({ type: 'izle', from: wiring.me, to: userId, kind })
+  send({ type: 'izle', to: userId, kind })
   // Teklif gelmezse (ör. yayıncı sinyali kaçırdıysa) bir kez daha istenir.
   clearTimeout(pendingRetries.get(key))
   pendingRetries.set(
     key,
     setTimeout(() => {
-      if (wiring && key in useVoice.getState().videos && !incoming.has(key)) send({ type: 'izle', from: wiring.me, to: userId, kind })
+      if (wiring && key in useVoice.getState().videos && !incoming.has(key)) send({ type: 'izle', to: userId, kind })
     }, RETRY_MS),
   )
 }
@@ -251,11 +256,21 @@ export function watch(userId: string, kind: VideoKind): void {
   request(userId, kind)
 }
 
+// Karşı taraf beni dinlemeye yeni başladıysa, ondan istediğim ama henüz gelmeyen görüntüler yeniden istenir
+// (ilk istek o dinlemeye başlamadan gitmiş olabilir).
+export function retryVideo(userId: string): void {
+  const { videos } = useVoice.getState()
+  for (const kind of ['screen', 'camera'] as const) {
+    const key = videoKey(userId, kind)
+    if (key in videos && !incoming.has(key)) request(userId, kind)
+  }
+}
+
 export function unwatch(userId: string, kind: VideoKind): void {
   const key = videoKey(userId, kind)
   if (!(key in useVoice.getState().videos)) return
   dropIncoming(key)
-  if (wiring) send({ type: 'birak', from: wiring.me, to: userId, kind })
+  if (wiring) send({ type: 'birak', to: userId, kind })
 }
 
 function dropIncoming(key: string): void {
@@ -272,7 +287,7 @@ async function accept(from: string, kind: VideoKind, sdp: string): Promise<void>
   clearTimeout(pendingRetries.get(key))
   pendingRetries.delete(key)
   closeLink(incoming, key)
-  const pc = new RTCPeerConnection({ iceServers: wiring.iceServers() })
+  const pc = new RTCPeerConnection(wiring.rtc())
   const link: Link = { pc, pending: [] }
   incoming.set(key, link)
 
@@ -281,7 +296,7 @@ async function accept(from: string, kind: VideoKind, sdp: string): Promise<void>
     if (stream && incoming.get(key) === link) setRemote(key, stream)
   }
   pc.onicecandidate = (event) => {
-    if (event.candidate) send({ type: 'aday', from: wiring!.me, to: from, kind, rol: 'izleyici', candidate: event.candidate.toJSON() })
+    if (event.candidate) send({ type: 'aday', to: from, kind, rol: 'izleyici', candidate: event.candidate.toJSON() })
   }
   pc.onconnectionstatechange = () => {
     if (pc.connectionState !== 'failed' || incoming.get(key) !== link) return
@@ -296,7 +311,7 @@ async function accept(from: string, kind: VideoKind, sdp: string): Promise<void>
   for (const candidate of link.pending.splice(0)) await pc.addIceCandidate(candidate).catch(() => {})
   const answer = await pc.createAnswer()
   await pc.setLocalDescription(answer)
-  if (incoming.get(key) === link) send({ type: 'cevap', from: wiring.me, to: from, kind, sdp: answer.sdp ?? '' })
+  if (incoming.get(key) === link) send({ type: 'cevap', to: from, kind, sdp: answer.sdp ?? '' })
 }
 
 // ---------------------------------------------------------------------------
@@ -305,11 +320,19 @@ async function accept(from: string, kind: VideoKind, sdp: string): Promise<void>
 
 const KINDS: readonly unknown[] = ['screen', 'camera']
 
-export async function onVideoSignal(payload: unknown): Promise<void> {
+function inRoom(userId: string): boolean {
+  const { channelId, rooms } = useVoice.getState()
+  return !!channelId && !!rooms[channelId]?.some((p) => p.userId === userId)
+}
+
+// from: sinyalin geldiği konunun sahibi (sunucu doğrular).
+export async function onVideoSignal(from: string, payload: unknown): Promise<void> {
   const message = (payload ?? {}) as Partial<Signal> & { to?: unknown }
-  if (!wiring || typeof message.from !== 'string' || message.from === wiring.me || !KINDS.includes(message.kind)) return
-  if ('to' in message && message.to !== wiring.me) return
-  const from = message.from
+  if (!wiring || from === wiring.me || !KINDS.includes(message.kind)) return
+  // "bitti" herkese duyurulur; diğerleri yalnızca bana yazılmışsa işlenir.
+  if (message.type !== 'bitti' && message.to !== wiring.me) return
+  // Kanalda görünmeyen birine görüntü gönderilmez, ondan görüntü alınmaz.
+  if (!inRoom(from)) return
   const kind = message.kind as VideoKind
   try {
     switch (message.type) {

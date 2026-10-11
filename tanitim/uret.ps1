@@ -5,7 +5,6 @@ $page = 'file:///' + ((Join-Path $PSScriptRoot 'kaynak\index.html') -replace '\\
 
 $shots = @(
   @{ s = '1'; file = 'tanitim-1-sohbet.png'; size = '1920,1080' },
-  @{ s = '2'; file = 'tanitim-2-ses.png'; size = '1920,1080' },
   @{ s = '3'; file = 'tanitim-3-gorunum.png'; size = '1920,1080' },
   @{ s = 'banner'; file = 'banner.png'; size = '1500,500' },
   @{ s = 'logo'; file = 'logo.png'; size = '1024,1024' },

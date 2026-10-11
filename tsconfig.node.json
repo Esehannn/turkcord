@@ -27,6 +27,7 @@
     "tests/**/*",
     "src/renderer/src/lib/markdown.ts",
     "src/renderer/src/lib/format.ts",
-    "src/renderer/src/voice/sdp.ts"
+    "src/renderer/src/voice/sdp.ts",
+    "src/renderer/src/voice/ice.ts"
   ]
 }

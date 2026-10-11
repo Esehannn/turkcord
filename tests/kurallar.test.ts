@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import { checkPassword } from '../src/shared/password.ts'
 import { isValidUsername, usernameProblem, usernameToEmail } from '../src/shared/username.ts'
 import { formatMessageTime, normalizeChannelName, sameGroup } from '../src/renderer/src/lib/format.ts'
+import { versionAtLeast } from '../supabase/functions/_shared/version.ts'
 
 test('şifre kuralları', () => {
   assert.equal(checkPassword('kisa1'), 'too_short')
@@ -30,6 +31,22 @@ test('kullanıcı adı kuralları', () => {
   assert.equal(isValidUsername('ab'), false)
   assert.match(usernameProblem('ğğğ') ?? '', /küçük harf/)
   assert.equal(usernameToEmail(' Veli '), 'veli@kullanici.turkcord.invalid')
+})
+
+test('asgari sürüm karşılaştırması', () => {
+  assert.equal(versionAtLeast('0.8.0', '0.8.0'), true)
+  assert.equal(versionAtLeast('0.8.1', '0.8.0'), true)
+  assert.equal(versionAtLeast('0.10.0', '0.9.9'), true)
+  assert.equal(versionAtLeast('1.0.0', '0.99.99'), true)
+  assert.equal(versionAtLeast('0.7.9', '0.8.0'), false)
+  assert.equal(versionAtLeast('0.7.10', '0.8.0'), false)
+  // Sürümünü bildirmeyen ya da bozuk bildiren eski sayılır.
+  assert.equal(versionAtLeast(undefined, '0.8.0'), false)
+  assert.equal(versionAtLeast('9.9', '0.8.0'), false)
+  assert.equal(versionAtLeast('9.9.9-beta', '0.8.0'), false)
+  // Asgari sürüm yanlış yazılmışsa kimse dışarıda kalmaz.
+  assert.equal(versionAtLeast('0.1.0', 'sekiz'), true)
+  assert.equal(versionAtLeast(undefined, ''), true)
 })
 
 test('saat biçimi', () => {

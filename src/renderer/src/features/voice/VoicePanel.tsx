@@ -56,7 +56,6 @@ export function VoicePanel() {
   // Gösterilen ping: odadakilerle aramdaki en yüksek gecikme (sesi en geç giden kişi).
   const linkList = Object.values(links).filter((l) => l.ping !== null)
   const worst = linkList.length ? Math.max(...linkList.map((l) => l.ping!)) : null
-  const relayed = linkList.some((l) => l.relay)
   const tooltip = linkList.length ? Object.values(links).map(linkTitle).join('\n') : 'Odada başka kimse yok'
 
   return (
@@ -74,7 +73,7 @@ export function VoicePanel() {
             {label}
             {!trouble && !pending && !ringing && worst !== null && (
               <span className={`text-xs font-medium ${pingClass(worst)}`} data-tip={tooltip}>
-                · {worst} ms{relayed ? ' ☁' : ''}
+                · {worst} ms
               </span>
             )}
           </span>

@@ -53,6 +53,14 @@ export function VoiceRoom({ channelId, me }: { channelId: string; me: string }) 
                 </span>
               )}
               {p.camera && <Video className="size-3.5 shrink-0 text-muted" aria-label="Kamerası açık" />}
+              {inThisRoom && p.userId !== me && p.legacy && (
+                <span
+                  className="shrink-0 rounded bg-hover px-1 text-[10px] leading-4 font-semibold tracking-wide text-muted"
+                  data-tip="Eski sürüm kullanıyor. Birbirinizi duyabilmeniz için Turkcord'u güncellemesi gerekiyor."
+                >
+                  ESKİ
+                </span>
+              )}
               {inThisRoom && p.userId !== me && <PingBadge link={links[p.userId]} />}
               {p.muted && <MicOff className="size-3.5 shrink-0 text-accent" aria-label="Mikrofonu kapalı" />}
               {p.deafened && <HeadphoneOff className="size-3.5 shrink-0 text-accent" aria-label="Sağırlaştırılmış" />}

@@ -431,6 +431,52 @@ select tests.fails(
   format('insert into realtime.messages (topic, extension) values (%L, %L)', 'ses:' || :'ses_id', 'broadcast'),
   'üye olmayan ses sinyali gönderemez', 'row-level security');
 
+-- Kimliği doğrulanan sinyal konuları ("sinyal:{kanal}:{kullanıcı}"): herkes yalnızca kendi konusuna yazar
+reset role;
+insert into realtime.messages (topic, extension, payload) values
+  ('sinyal:' || :'ses_id' || ':' || :'veli', 'broadcast', '{"type":"teklif"}'),
+  ('sinyal:' || :'ses_id' || ':' || :'ali', 'broadcast', '{"type":"cevap"}');
+select tests.login(:'veli');
+select tests.topic('sinyal:' || :'ses_id' || ':' || :'veli');
+set role authenticated;
+select tests.ok((select count(*) = 1 from realtime.messages where topic = realtime.topic()), 'üye kendi sinyal konusunu dinleyebilir');
+insert into realtime.messages (topic, extension) values ('sinyal:' || :'ses_id' || ':' || :'veli', 'broadcast');
+select tests.fails(
+  format('insert into realtime.messages (topic, extension) values (%L, %L)', 'sinyal:' || :'ses_id' || ':' || :'veli', 'presence'),
+  'sinyal konusunda presence kullanılamaz', 'row-level security');
+
+reset role;
+select tests.topic('sinyal:' || :'ses_id' || ':' || :'ali');
+set role authenticated;
+select tests.ok((select count(*) = 1 from realtime.messages where topic = realtime.topic()), 'üye başka bir üyenin sinyal konusunu dinleyebilir');
+select tests.fails(
+  format('insert into realtime.messages (topic, extension) values (%L, %L)', 'sinyal:' || :'ses_id' || ':' || :'ali', 'broadcast'),
+  'üye başka bir üyenin sinyal konusuna yazamaz', 'row-level security');
+
+reset role;
+select tests.topic('sinyal:' || :'ses_id' || ':' || :'veli' || ':ek');
+set role authenticated;
+select tests.fails(
+  format('insert into realtime.messages (topic, extension) values (%L, %L)', 'sinyal:' || :'ses_id' || ':' || :'veli' || ':ek', 'broadcast'),
+  'sinyal konusunun adı tam olarak kanal ve kendi kimliği olmalı', 'row-level security');
+
+reset role;
+select tests.topic('sinyal:bozuk:' || :'veli');
+set role authenticated;
+select tests.ok((select count(*) = 0 from realtime.messages where topic like 'sinyal:%'), 'bozuk sinyal konusu hata vermeden reddedilir');
+
+reset role;
+select tests.login(:'mehmet');
+select tests.topic('sinyal:' || :'ses_id' || ':' || :'veli');
+set role authenticated;
+select tests.ok((select count(*) = 0 from realtime.messages where topic = realtime.topic()), 'üye olmayan sinyal konularını dinleyemez');
+reset role;
+select tests.topic('sinyal:' || :'ses_id' || ':' || :'mehmet');
+set role authenticated;
+select tests.fails(
+  format('insert into realtime.messages (topic, extension) values (%L, %L)', 'sinyal:' || :'ses_id' || ':' || :'mehmet', 'broadcast'),
+  'üye olmayan kendi adına da sinyal konusu açamaz', 'row-level security');
+
 reset role;
 set role anon;
 select tests.fails($$select count(*) from realtime.messages$$, 'giriş yapmamış biri kanallara erişemez', 'permission denied');

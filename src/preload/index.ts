@@ -22,6 +22,7 @@ const api: TurkcordApi = {
     return () => ipcRenderer.removeListener('guncelleme:hazir', listener)
   },
   installUpdate: () => ipcRenderer.invoke('guncelleme:kur'),
+  checkForUpdate: () => ipcRenderer.send('guncelleme:denetle'),
   updateStage: () => ipcRenderer.invoke('guncelleme:asama-oku'),
   skipUpdate: () => ipcRenderer.send('guncelleme:atla'),
   onUpdateStage: (callback) => {

@@ -27,6 +27,13 @@ Arayüz metinleri, kod yorumları ve commit mesajları Türkçe.
 - Alias (`@/`) kullanmayan saf yardımcılar (`lib/files.ts`, `lib/coalesce.ts`, `lib/format.ts`, `lib/markdown.ts`, `lib/search.ts`) `node --test` ile doğrudan test edilir;
   bu dosyalara alias'lı içe aktarım ekleme.
 - Bireysel aramalar ses kanallarıyla aynı motoru kullanır (`voice/engine.ts`, `serverId` null); çaldırma `calls` tablosundan geçer (`voice/call.ts`).
+- Ses ve görüntü yalnızca Cloudflare TURN üzerinden gider (`voice/ice.ts`, `iceTransportPolicy: 'relay'`); her
+  `RTCPeerConnection` `relayConfig` ile kurulur. STUN ya da doğrudan (P2P) bağlantıya geri dönüş ekleme: kanaldakilerin
+  IP adresleri birbirine görünür. TURN bilgisi alınamazsa kanala girilmez.
+- Sinyaller: herkes yalnızca kendi konusuna yazar (`sinyal:{kanal}:{kullanıcı}`, kuralı veritabanı zorlar) ve yalnızca
+  kanalda görünen (presence listesindeki) kişilerin konusu dinlenir (`engine.ts` `listen` / `syncListeners`). Gönderen,
+  mesajın içinden değil geldiği konudan okunur; yeni bir sinyal ya da olay eklerken mesaja "kimden" alanı koyma ve
+  ortak bir konuya yazma. Yoksa biri başkası adına ya da listede görünmeden bağlanabilir.
 - Görüntü (ekran paylaşımı, kamera) ses bağlantısından geçmez: `voice/video.ts` her izleyici için ayrı, tek yönlü bir bağlantı
   kurar. Ses bağlantısını (`engine.ts`) görüntü için yeniden pazarlık ettirme; ses kopmaları buradan çıkar. Görüntü yalnızca
   onu gösteren ekran açıkken izlenir (`useCameraFeeds`, "İzle" düğmesi).

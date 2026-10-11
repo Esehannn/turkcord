@@ -3,13 +3,14 @@ import type { EffectId } from '@/lib/sounds'
 
 // since: kanala girdiği an (ms, kendi saatine göre); eski sürümler bildirmez.
 // screen / camera: ekranını paylaşıyor / kamerası açık (0.7.0 öncesi sürümler bildirmez).
-export type VoiceParticipant = { userId: string; muted: boolean; deafened: boolean; since?: number; screen?: boolean; camera?: boolean }
+// legacy: eski bir sürüm kullanıyor (0.7.0 ve öncesi); sinyal düzeni farklı olduğu için onunla bağlantı kurulamaz.
+export type VoiceParticipant = { userId: string; muted: boolean; deafened: boolean; since?: number; screen?: boolean; camera?: boolean; legacy?: boolean }
 export type VoiceStatus = 'idle' | 'connecting' | 'connected'
 // kapali: işlem yok, standart: tarayıcının gürültü engellemesi, guclu: yapay zekâ (RNNoise).
 export type NoiseMode = 'kapali' | 'standart' | 'guclu'
 // ses: konuşunca açılır, bas-konus: tuşa basılı tutunca açılır.
 export type InputMode = 'ses' | 'bas-konus'
-export type PeerLink = { ping: number | null; relay: boolean }
+export type PeerLink = { ping: number | null }
 
 type VoicePrefs = {
   inputDeviceId: string

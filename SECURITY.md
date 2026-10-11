@@ -33,9 +33,27 @@ Bir güvenlik açığı bulursan lütfen herkese açık bir issue açma. GitHub'
 
 **Sesli sohbet**
 
-- Ses doğrudan katılımcılar arasında (P2P, WebRTC/DTLS-SRTP ile şifreli) akar; Supabase'ten geçmez.
-- Bağlantı bilgisi sadece o ses kanalının sunucusundaki üyeler arasında, korumalı Realtime kanalında paylaşılır.
-  P2P'nin doğası gereği aynı ses kanalındaki kişiler birbirinin IP adresini görebilir.
+- Ses katılımcılar arasında uçtan uca şifreli (WebRTC/DTLS-SRTP) akar ve yalnızca Cloudflare'in aktarma (TURN)
+  sunucusundan geçer; Supabase'ten geçmez. Cloudflare şifreli paketleri iletir, içeriğini çözemez.
+- Doğrudan (P2P) bağlantı kurulmaz (`iceTransportPolicy: 'relay'`): uygulama yerel ya da genel IP adresini karşı tarafa
+  hiç bildirmez, kanaldaki kişiler birbirinin değil Cloudflare'in adresini görür. Aktarma sunucusuna ulaşılamazsa
+  kanala girilmez; doğrudan bağlantıya geri dönülmez.
+- Bağlantı bilgisi (sinyal) sadece o ses kanalına erişimi olanlar arasında, korumalı Realtime kanallarında paylaşılır.
+  Herkes yalnızca kendi konusuna (`sinyal:{kanal}:{kullanıcı}`) yazabilir; bunu veritabanı zorlar. Bir sinyalin kimden
+  geldiğini mesajın içeriği değil, geldiği konu belirler: kimse başkası adına bağlantı kuramaz, durum ya da efekt
+  gönderemez.
+- Ses ve görüntü bağlantısı yalnızca kanalda görünen (katılımcı listesindeki) kişilerle kurulur: yalnızca
+  listedekilerin konusu dinlenir, listeden çıkanın bağlantısı hemen kapanır. Kimin dinlediği ve izlediği her zaman
+  listede görünür.
+- Bilinen sınır: katılımcı listesi (presence) kişinin kendi bildirdiği kimliğe dayanır. Kanala erişimi olan biri,
+  değiştirilmiş bir istemciyle listede başka bir üye gibi görünebilir; ama o üyenin konusuna yazamadığı için onun
+  adına bağlantı kuramaz, yani bu yolla ses ya da görüntü alamaz.
+- 0.7.0 ve öncesi sürümler eski düzeni kullanır (doğrudan bağlantı, ortak sinyal konusu) ve bu korumaların hiçbirine
+  sahip değildir; güncel sürümdekilerle sesli konuşamazlar. Eski düzenin veritabanı yetkisi, herkes güncelleyince
+  kaldırılır.
+- İsteğe bağlı asgari sürüm (`MIN_APP_VERSION`): sunucu, daha eski sürüme aktarma bilgisi vermez ve uygulama
+  güncelleme ister. Sürümü uygulama kendi bildirdiği için bu, değiştirilmiş bir istemciye karşı koruma değildir;
+  güncellemeyi erteleyen kullanıcıyı günceller.
 - Cloudflare TURN bilgisi sunucu tarafında kısa ömürlü olarak üretilir; API anahtarı Supabase'in gizli ayarlarında durur.
 - Bireysel aramalar sadece özel mesajın iki tarafı arasında başlatılabilir; engelleme varsa arama yapılamaz. Arama
   kayıtlarını (`calls`) sadece taraflar görür ve durumları sadece sunucudaki fonksiyonlar değiştirir (dakikada en fazla 6 arama).
@@ -61,8 +79,8 @@ Bir güvenlik açığı bulursan lütfen herkese açık bir issue açma. GitHub'
 - Yalnızca mikrofon, kamera ve ekran paylaşımı izinleri verilir; konum gibi diğer izinler reddedilir.
 - Ekran yakalama yalnızca kullanıcının uygulamanın kendi seçim penceresinde seçtiği ekrana ya da pencereye verilir.
   Seçim tek kullanımlıktır; seçim yapılmadan gelen yakalama isteği ana süreçte reddedilir.
-- Görüntü (kamera, ekran) sunucudan geçmez; izleyen kişiyle doğrudan (P2P) bağlantı üzerinden gider ve yalnızca
-  izlemek isteyen kişiye gönderilir.
+- Görüntü (kamera, ekran) de ses gibi uçtan uca şifreli olarak yalnızca Cloudflare aktarma sunucusundan geçer ve
+  yalnızca izlemek isteyen kişiye gönderilir.
 - Her yerde çalışan kısayollar sadece kullanıcının seçtiği tuş kombinasyonlarını dinler (tuş kaydı yapılmaz);
   ana süreç sadece `Ctrl/Alt/Shift + harf/rakam/F tuşu` biçimindeki kısayolları kabul eder.
 - Güncellemeler sadece bu reponun GitHub Releases sayfasından (HTTPS) indirilir; kurulumdan önce dosyanın SHA-512
