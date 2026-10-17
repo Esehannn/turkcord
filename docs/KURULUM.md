@@ -49,27 +49,40 @@ Uygulamada **Kayıt Ol** ekranında bu kodu kullan. Sonraki davet kodlarını uy
 2. `package.json`'daki sürümü artır, `v0.1.0` gibi bir etiket gönder ya da **Actions → Sürüm → Run workflow** de.
 3. Kurulum dosyası **Releases** sayfasına yüklenir.
 
-## 5. Sesli sohbet için Cloudflare TURN (zorunlu)
+## 5. Sesli sohbet için Cloudflare Realtime (zorunlu)
 
-Ses, ekran paylaşımı ve kamera yalnızca Cloudflare'in TURN (aktarma) sunucusu üzerinden gider; bilgisayarlar
-birbirine doğrudan (P2P) bağlanmaz, böylece kimse karşısındakinin IP adresini göremez. Bu yüzden TURN tanımlı
-değilse sesli sohbet çalışmaz ("Ses sunucusuna ulaşılamadı").
+Ses, ekran paylaşımı ve kamera odanın sunucusu üzerinden gider (Cloudflare Realtime SFU): herkes Cloudflare'e tek bir
+bağlantı kurar, kanaldakiler birbirine bağlanmaz, kimse karşısındakinin IP adresini göremez. SFU uygulaması tanımlı
+değilse sesli sohbet çalışmaz ("Ses sunucusuna ulaşılamadı"). TURN, UDP'nin kapalı olduğu ağlar için yedektir.
 
-Ücretsiz kota ayda 1.000 GB'dır (Cloudflare'den kullanıcıya giden veri sayılır), sonrası GB başına 0,05 $.
-Ses için fazlasıyla yeter (konuşan kişi başına, dinleyen başına saatte ~30-40 MB). Kotayı asıl ekran
-paylaşımı harcar: izleyen kişi başına saatte 720p/30'da ~1,1 GB, 1080p/60'ta ~3,2 GB.
+Ücretsiz kota SFU ve TURN için ortaktır: ayda 1.000 GB (Cloudflare'den kullanıcıya giden veri sayılır; SFU'yla birlikte
+kullanılan TURN ayrıca sayılmaz), sonrası GB başına 0,05 $. Ses için fazlasıyla yeter (dinleyen başına, konuşan kişi
+başına saatte ~30 MB). Kotayı asıl ekran paylaşımı harcar: izleyen kişi başına saatte 720p/30'da ~1,1 GB, 1080p/60'ta
+~3,2 GB. Yayıncının gönderdiği veri sayılmaz.
 
-1. [dash.cloudflare.com](https://dash.cloudflare.com) → sol menüde **Realtime** → **TURN Server** → **Create**.
+**SFU uygulaması**
+
+1. [dash.cloudflare.com](https://dash.cloudflare.com) → sol menüde **Realtime** → **SFU** → **Create application**.
+2. Bir ad ver (ör. `turkcord`). Oluşunca iki değer gösterilir: **App ID** ve **App Token** (App Secret).
+3. Supabase → **Edge Functions → Secrets** (Manage secrets) → iki gizli değer ekle:
+   - `CLOUDFLARE_SFU_APP_ID` = App ID
+   - `CLOUDFLARE_SFU_APP_TOKEN` = App Token
+4. Kaydet. Uygulama Cloudflare'le yalnızca `oda` fonksiyonu üzerinden konuşur.
+
+Denemeler için ayrı bir uygulama aç (ör. `turkcord-deneme`); Cloudflare de ortamları ayırmayı önerir.
+
+**TURN (yedek)**
+
+1. Aynı yerde **Realtime** → **TURN Server** → **Create**.
 2. Bir ad ver (ör. `turkcord`). Oluşunca iki değer gösterilir: **Turn Token ID** ve **API Token**.
    API Token sadece bir kez gösterilir; hemen bir sonraki adıma geç.
-3. Supabase → **Edge Functions → Secrets** (Manage secrets) → iki gizli değer ekle:
+3. Supabase → **Edge Functions → Secrets** → iki gizli değer ekle:
    - `CLOUDFLARE_TURN_KEY_ID` = Turn Token ID
    - `CLOUDFLARE_TURN_API_TOKEN` = API Token
-4. Kaydet. Uygulama bir sonraki ses bağlantısında TURN bilgisini `turn` fonksiyonundan alır.
 
 Bu değerler gizlidir: repoya, sohbete ya da uygulamaya yazılmaz; sadece Supabase'te durur.
 
-**Asgari sürüm (isteğe bağlı):** Aynı yere `MIN_APP_VERSION` adında bir değer eklersen (ör. `0.8.1`), daha eski
+**Asgari sürüm (isteğe bağlı):** Aynı yere `MIN_APP_VERSION` adında bir değer eklersen (ör. `0.9.0`), daha eski
 sürümdeki uygulama sesli sohbete giremez ve kullanıcıdan güncellemesi istenir. Yeni bir sürüm herkese ulaştıktan
 sonra bu değeri o sürüme çekmek yeterlidir. Değer yanlış yazılırsa (ör. `0.8`) sınır uygulanmaz. Bu ayarı 0.8.0 ve
 sonrası tanır; 0.7.0 ve öncesi tanımaz (onları devre dışı bırakan, eski sinyal yetkisinin veritabanından kaldırılmasıdır).

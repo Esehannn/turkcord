@@ -432,3 +432,7 @@ verify_jwt = false
 [functions.turn]
 enabled = true
 verify_jwt = false
+
+[functions.oda]
+enabled = true
+verify_jwt = false

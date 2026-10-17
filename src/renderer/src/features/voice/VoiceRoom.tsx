@@ -7,7 +7,7 @@ import { useUi } from '@/stores/ui'
 import { setUserVolume } from '@/voice/engine'
 import { watchVoiceRoom } from '@/voice/presence'
 import { useVoice } from '@/voice/store'
-import { PingBadge } from './Ping'
+import { PeerBadge } from './Ping'
 
 // Ses kanalının altında o an kanalda olanlar. Konuşanın avatarı yeşil çerçeveyle parlar.
 export function VoiceRoom({ channelId, me }: { channelId: string; me: string }) {
@@ -15,7 +15,6 @@ export function VoiceRoom({ channelId, me }: { channelId: string; me: string }) 
   const speaking = useVoice((s) => s.speaking)
   const myChannel = useVoice((s) => s.channelId)
   const peers = useVoice((s) => s.peers)
-  const links = useVoice((s) => s.links)
   const { data: profiles } = useProfiles()
   const [menu, setMenu] = useState<{ userId: string; x: number; y: number } | null>(null)
 
@@ -30,7 +29,7 @@ export function VoiceRoom({ channelId, me }: { channelId: string; me: string }) 
         const profile = profiles?.get(p.userId)
         const name = profile?.display_name ?? 'Biri'
         const talking = inThisRoom && !!speaking[p.userId] && !p.muted && !p.deafened
-        const connecting = inThisRoom && p.userId !== me && peers[p.userId] && peers[p.userId] !== 'connected'
+        const connecting = inThisRoom && p.userId !== me && peers[p.userId] === 'connecting'
         return (
           <li key={p.userId}>
             <button
@@ -44,7 +43,7 @@ export function VoiceRoom({ channelId, me }: { channelId: string; me: string }) 
               <span className={`flex shrink-0 rounded-full ${talking ? 'speaking-glow' : ''}`}>
                 <Avatar name={name} path={profile?.avatar_path} size={22} />
               </span>
-              <span className={`min-w-0 flex-1 truncate ${talking ? 'font-semibold text-fg' : ''} ${connecting ? 'opacity-60' : ''}`}>
+              <span className={`min-w-0 flex-1 truncate ${talking ? 'font-semibold text-fg' : ''} ${connecting || peers[p.userId] === 'lost' ? 'opacity-60' : ''}`}>
                 {name}
               </span>
               {p.screen && (
@@ -61,7 +60,7 @@ export function VoiceRoom({ channelId, me }: { channelId: string; me: string }) 
                   ESKİ
                 </span>
               )}
-              {inThisRoom && p.userId !== me && <PingBadge link={links[p.userId]} />}
+              {inThisRoom && p.userId !== me && <PeerBadge state={peers[p.userId]} />}
               {p.muted && <MicOff className="size-3.5 shrink-0 text-accent" aria-label="Mikrofonu kapalı" />}
               {p.deafened && <HeadphoneOff className="size-3.5 shrink-0 text-accent" aria-label="Sağırlaştırılmış" />}
             </button>

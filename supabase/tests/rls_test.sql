@@ -779,5 +779,95 @@ set role authenticated;
 select tests.ok((select count(*) = 0 from public.voice_joins), 'üye olmayan girişleri göremez');
 select tests.fails(format('select public.announce_voice_join(%L)', :'ses_id'), 'üye olmayan giriş bildiremez', 'turkcord:forbidden');
 
+-- ---------------------------------------------------------------------------
+-- Ses odası sunucusu (Cloudflare SFU) oturum kayıtları
+-- ---------------------------------------------------------------------------
+
+reset role;
+-- Bu fonksiyonları yalnızca "oda" Edge Function'ı (service_role) çağırır.
+grant usage on schema tests to service_role;
+select tests.login(:'veli');
+set role authenticated;
+select tests.fails(
+  format('select public.sfu_register(%L, %L, %L, %L)', :'veli', :'ses_id', 'ses', repeat('a', 32)),
+  'uygulama oturum kaydını kendisi yapamaz', 'permission denied');
+select tests.fails(
+  format('select * from public.sfu_targets(%L, %L, array[%L]::uuid[])', :'veli', repeat('a', 32), :'ali'),
+  'uygulama başkasının oturumunu soramaz', 'permission denied');
+
+reset role;
+set role service_role;
+select public.sfu_register(:'veli', :'ses_id', 'ses', repeat('a', 32));
+select public.sfu_register(:'ali', :'ses_id', 'ses', repeat('b', 32));
+reset role;
+select tests.ok(
+  (select count(*) = 2 from realtime.messages where topic = 'oda:' || :'ses_id' and event = 'oturum'),
+  'sese giren herkes oda konusuna duyurulur');
+set role service_role;
+select tests.fails(
+  format('select public.sfu_register(%L, %L, %L, %L)', :'veli', :'genel_id', 'ses', repeat('c', 32)),
+  'yazı kanalında ses oturumu açılamaz', 'turkcord:forbidden');
+select tests.fails(
+  format('select public.sfu_register(%L, %L, %L, %L)', :'mehmet', :'ses_id', 'ses', repeat('c', 32)),
+  'üye olmayan ses oturumu açamaz', 'turkcord:forbidden');
+select tests.fails(
+  format('select public.sfu_register(%L, %L, %L, %L)', :'veli', :'ses_id', 'ses', 'oturum; drop'),
+  'bozuk oturum kimliği reddedilir', 'turkcord:invalid_input');
+select tests.fails(
+  format('select public.sfu_register(%L, %L, %L, %L)', :'ayse', :'dm_id', 'goruntu', repeat('d', 32)),
+  'seste olmayan görüntü oturumu açamaz', 'turkcord:forbidden');
+select public.sfu_register(:'ali', :'ses_id', 'goruntu', repeat('e', 32));
+
+select tests.ok(
+  (select count(*) = 1 from public.sfu_targets(:'ali', repeat('b', 32), array[:'veli', :'mehmet', :'ali']::uuid[])),
+  'yalnızca aynı kanaldaki başkalarının oturumu döner');
+select tests.ok(
+  (select count(*) = 2 from public.sfu_targets(:'veli', repeat('a', 32), array[:'ali']::uuid[])),
+  'aynı kanaldakinin ses ve görüntü oturumu döner');
+select tests.ok(
+  (select session_id = repeat('b', 32) from public.sfu_targets(:'veli', repeat('a', 32), array[:'ali']::uuid[]) where kind = 'ses'),
+  'oturum kimliği doğru eşleşiyor');
+select tests.fails(
+  format('select * from public.sfu_targets(%L, %L, array[%L]::uuid[])', :'veli', repeat('b', 32), :'ali'),
+  'başkasının oturumuyla çekme yapılamaz', 'turkcord:not_found');
+select tests.fails(
+  format('select * from public.sfu_session(%L, %L)', :'veli', repeat('b', 32)),
+  'başkasının oturumu kullanılamaz', 'turkcord:not_found');
+select tests.ok(
+  (select channel_id = :'ses_id' and kind = 'goruntu' from public.sfu_session(:'ali', repeat('e', 32))),
+  'kendi oturumunun kanalı ve türü okunur');
+
+-- Özel mesajda arama: başka kanala geçen kişinin eski oturumları eski kanalda çekilemez.
+select public.sfu_register(:'veli', :'ses_id', 'goruntu', repeat('1', 32));
+select public.sfu_register(:'veli', :'dm_id', 'ses', repeat('f', 32));
+select tests.ok(
+  (select count(*) = 0 from public.sfu_targets(:'ali', repeat('b', 32), array[:'veli']::uuid[])),
+  'başka kanala geçenin ses ve görüntü oturumu eski kanalda çekilemez');
+select tests.fails(
+  format('select public.sfu_register(%L, %L, %L, %L)', :'mehmet', :'dm_id', 'ses', repeat('9', 32)),
+  'özel mesajın tarafı olmayan aramaya giremez', 'turkcord:forbidden');
+select public.sfu_register(:'veli', :'dm_id', 'goruntu', repeat('2', 32));
+select public.sfu_unregister(:'veli', repeat('f', 32));
+reset role;
+select tests.ok(
+  (select count(*) = 0 from private.voice_sessions where user_id = :'veli'),
+  'çıkınca ses ve görüntü oturumu silinir');
+
+reset role;
+select tests.login(:'veli');
+set role authenticated;
+select tests.topic('oda:' || :'ses_id');
+select tests.ok((select count(*) = 2 from realtime.messages where topic = realtime.topic()), 'üye oda duyurularını dinleyebilir');
+select tests.fails(
+  format('insert into realtime.messages (topic, extension) values (%L, %L)', 'oda:' || :'ses_id', 'broadcast'),
+  'oda konusuna kimse yazamaz', 'row-level security');
+select tests.fails('select count(*) from private.voice_sessions', 'oturum tablosu uygulamaya kapalı', 'permission denied');
+
+reset role;
+select tests.login(:'mehmet');
+set role authenticated;
+select tests.topic('oda:' || :'ses_id');
+select tests.ok((select count(*) = 0 from realtime.messages where topic = realtime.topic()), 'üye olmayan oda duyurularını göremez');
+
 reset role;
 \echo 'Tüm veritabanı testleri geçti.'

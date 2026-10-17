@@ -27,7 +27,7 @@ import { watchVoiceRoom } from '@/voice/presence'
 import { useVoice, type VoiceParticipant } from '@/voice/store'
 import { startCamera, stopCamera, stopScreen, unwatch, videoKey, watch } from '@/voice/video'
 import { Elapsed, roomSince } from './Elapsed'
-import { PingBadge } from './Ping'
+import { PeerBadge } from './Ping'
 import { useCameraFeeds, VideoView } from './VideoView'
 import { ParticipantMenu } from './VoiceRoom'
 
@@ -220,8 +220,8 @@ function StageTile({
   const profile = profiles?.get(p.userId)
   const name = profile?.display_name ?? 'Biri'
   const talking = useVoice((s) => inRoom && !!s.speaking[p.userId]) && !p.muted && !p.deafened
-  const waiting = useVoice((s) => inRoom && !mine && !!s.peers[p.userId] && s.peers[p.userId] !== 'connected')
-  const link = useVoice((s) => s.links[p.userId])
+  const peerState = useVoice((s) => (inRoom && !mine ? s.peers[p.userId] : undefined))
+  const waiting = peerState === 'connecting'
   const remote = useVoice((s) => s.videos[videoKey(p.userId, kind === 'screen' ? 'screen' : 'camera')])
   const local = useVoice((s) => (kind === 'screen' ? s.localScreen : s.localCamera))
   const ref = useRef<HTMLDivElement>(null)
@@ -280,7 +280,9 @@ function StageTile({
   } else {
     body = (
       <div className="grid size-full place-items-center bg-sidebar">
-        <span className={`flex rounded-full ${talking ? 'speaking-glow' : ''} ${waiting ? 'opacity-60' : ''}`}>
+        <span
+          className={`flex rounded-full transition-[opacity,filter] duration-300 ${talking ? 'speaking-glow' : ''} ${waiting ? 'opacity-60' : ''} ${peerState === 'lost' ? 'opacity-50 grayscale' : ''}`}
+        >
           <Avatar name={name} path={profile?.avatar_path} size={compact ? 40 : 88} />
         </span>
       </div>
@@ -320,7 +322,7 @@ function StageTile({
             ) : (
               p.since !== undefined && <Elapsed since={p.since} className="tabular-nums" />
             )}
-            {inRoom && !mine && !waiting && <PingBadge link={link} />}
+            <PeerBadge state={peerState} />
           </span>
         )}
       </div>

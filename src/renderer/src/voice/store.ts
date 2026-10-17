@@ -3,14 +3,17 @@ import type { EffectId } from '@/lib/sounds'
 
 // since: kanala girdiği an (ms, kendi saatine göre); eski sürümler bildirmez.
 // screen / camera: ekranını paylaşıyor / kamerası açık (0.7.0 öncesi sürümler bildirmez).
-// legacy: eski bir sürüm kullanıyor (0.7.0 ve öncesi); sinyal düzeni farklı olduğu için onunla bağlantı kurulamaz.
+// legacy: başka bir ses düzeninde (0.8.0 ve öncesi); onunla birbirinizi duyamazsınız.
 export type VoiceParticipant = { userId: string; muted: boolean; deafened: boolean; since?: number; screen?: boolean; camera?: boolean; legacy?: boolean }
 export type VoiceStatus = 'idle' | 'connecting' | 'connected'
 // kapali: işlem yok, standart: tarayıcının gürültü engellemesi, guclu: yapay zekâ (RNNoise).
 export type NoiseMode = 'kapali' | 'standart' | 'guclu'
 // ses: konuşunca açılır, bas-konus: tuşa basılı tutunca açılır.
 export type InputMode = 'ses' | 'bas-konus'
-export type PeerLink = { ping: number | null }
+// Cloudflare'e olan bağlantım: gidiş-dönüş süresi ve yolu ("udp", "tcp" ya da "aktarma/…").
+export type PeerLink = { ping: number | null; transport: string | null }
+// Bir kişinin sesi: çekiliyor, geliyor ya da gelmiyor (yeniden deneniyor).
+export type PeerState = 'connecting' | 'connected' | 'lost'
 
 type VoicePrefs = {
   inputDeviceId: string
@@ -40,9 +43,10 @@ type VoiceState = VoicePrefs & {
   speaking: Record<string, boolean>
   // Her ses kanalında kimler var (presence).
   rooms: Record<string, VoiceParticipant[]>
-  // Kişi başı bağlantı durumu ve gecikme.
-  peers: Record<string, RTCPeerConnectionState>
-  links: Record<string, PeerLink>
+  // Kişi başı ses durumu, Cloudflare'e olan bağlantım ve bağlantı kopup yeniden kuruluyor mu.
+  peers: Record<string, PeerState>
+  link: PeerLink | null
+  reconnecting: boolean
   // Kanalda en son çalınan ses efekti (kimin bastığını göstermek için).
   lastEffect: { userId: string; id: EffectId; at: number } | null
   // Benim paylaştıklarım (yoksa null).
@@ -106,7 +110,8 @@ export const useVoice = create<VoiceState>((set, get) => ({
   speaking: {},
   rooms: {},
   peers: {},
-  links: {},
+  link: null,
+  reconnecting: false,
   lastEffect: null,
   localScreen: null,
   localCamera: null,

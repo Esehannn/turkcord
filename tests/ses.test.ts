@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { relayConfig, relayServers } from '../src/renderer/src/voice/ice.ts'
+import { relayServers, rtcConfig } from '../src/renderer/src/voice/ice.ts'
 import { tuneOpus } from '../src/renderer/src/voice/sdp.ts'
 
 const SDP = [
@@ -58,7 +58,7 @@ test('TURN yoksa liste boştur (doğrudan bağlantıya dönülmez)', () => {
   assert.deepEqual(relayServers([null, 'turn:turn.cloudflare.com:3478', { urls: 5, username: 'k', credential: 's' }]), [])
 })
 
-test('bağlantı ayarı yalnızca aktarmaya izin verir', () => {
+test('bağlantı ayarı Cloudflare aktarmasını yedek olarak ekler', () => {
   const servers = relayServers([{ urls: 'turn:turn.cloudflare.com:3478?transport=udp', username: 'k', credential: 's' }])
-  assert.deepEqual(relayConfig(servers), { iceServers: servers, iceTransportPolicy: 'relay' })
+  assert.deepEqual(rtcConfig(servers), { iceServers: servers, iceTransportPolicy: 'all' })
 })
