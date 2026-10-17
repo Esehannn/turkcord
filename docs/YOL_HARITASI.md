@@ -6,8 +6,8 @@
 |---|---|
 | Platform | Windows masaüstü (Electron + React + TypeScript) |
 | Sunucu | Supabase ücretsiz plan, Frankfurt |
-| Görüntü | Ekran paylaşımı ve kamera da ses gibi yalnızca Cloudflare TURN üzerinden; ses bağlantısından ayrı, izleyen başına tek yönlü bağlantı. Kanalda aynı anda en fazla 2 ekran paylaşımı; kamerada sınır yok |
-| Ses | WebRTC, uçtan uca şifreli; yalnızca Cloudflare TURN üzerinden (ayda 1.000 GB ücretsiz), doğrudan (P2P) bağlantı yok: kimse karşısındakinin IP adresini görmez. Bağlantı kurulumu Supabase Realtime ile |
+| Görüntü | Ekran paylaşımı ve kamera da ses gibi Cloudflare Realtime SFU üzerinden, ses oturumundan ayrı bir oturumla; yayıncı ancak biri izleyince gönderir. Kanalda aynı anda en fazla 2 ekran paylaşımı; kamerada sınır yok |
+| Ses | WebRTC; odanın sunucusu Cloudflare Realtime SFU (SFU ve TURN için ortak, ayda 1.000 GB ücretsiz). Herkes Cloudflare'e tek bağlantı kurar, kişiden kişiye bağlantı yok: kimse karşısındakinin IP adresini görmez. Cloudflare'le yalnızca `oda` Edge Function'ı konuşur |
 | Kayıt | Sadece davet koduyla; giriş kullanıcı adı + şifre |
 | Tema | Kırmızı-beyaz (varsayılan açık), koyu tema seçeneği |
 | Dağıtım | Repo herkese açık, kurulum dosyaları GitHub Releases'ta |
@@ -41,6 +41,11 @@
 - [x] **10. Ses güvenliği (0.8.0)**: ses ve görüntü yalnızca Cloudflare üzerinden (IP adresleri görünmez), bağlantı
   yalnızca kanalda görünen kişilerle, gönderen kimliği veritabanında doğrulanan sinyal konuları, asgari sürüm kontrolü,
   eski sürümdeki katılımcı için "ESKİ" işareti
+
+- [x] **11. Ses odası sunucusu (0.9.0)**: ses ve görüntü Cloudflare Realtime SFU üzerinden (kişi başı tek bağlantı,
+  sesin bir kez gönderilmesi), kopmayı fark eden bekçi ve kendiliğinden yeniden bağlanma, "Yeniden bağlanıyor…" ve
+  "sesi gelmiyor" göstergeleri, Cloudflare'e olan gecikme ve sinyal çubukları, yayının yalnızca izlenirken gönderilmesi,
+  listede görünmeden bağlanan için uyarı
 
 ## Sıradaki fikirler
 

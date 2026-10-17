@@ -98,3 +98,12 @@ as $$
 $$;
 
 create publication supabase_realtime;
+
+-- Veritabanından yayın (Supabase'deki realtime.send'in sadeleştirilmiş hali).
+create function realtime.send(payload jsonb, event text, topic text, private boolean default true)
+returns void
+language sql
+as $$
+  insert into realtime.messages (topic, extension, payload, event, private)
+  values (topic, 'broadcast', payload, event, private);
+$$;

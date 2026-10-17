@@ -44,7 +44,7 @@ Sunucu tarafında [Supabase](https://supabase.com) kullanır ve ücretsiz planla
 | ✅ | Ses odası: kanaldakiler büyük kartlarla, konuşan çerçevesi, ping ve seste geçen süre |
 | ✅ | Ekran paylaşımı: ekran ya da pencere, 720p-1080p ve 30-60 kare, isteğe bağlı bilgisayar sesi; izleyen "İzle"ye basınca gelir |
 | ✅ | Görüntülü sohbet: ses kanalında ve bireysel aramada kamera; tam ekran, odak düzeni, küçük oynatıcı |
-| ✅ | Sesli sohbet: uçtan uca şifreli WebRTC, yalnızca Cloudflare üzerinden (IP adresin karşıya görünmez), konuşan göstergesi, ping göstergesi, susturma/sağırlaştırma, kişi başı ses ayarı, cihaz seçimi |
+| ✅ | Sesli sohbet: Cloudflare'in ses sunucusu üzerinden (kişi başı tek bağlantı, IP adresin karşıya görünmez), kopunca kendiliğinden yeniden bağlanma, konuşan göstergesi, ping göstergesi, susturma/sağırlaştırma, kişi başı ses ayarı, cihaz seçimi |
 | ✅ | Bireysel sesli arama: özel mesajdan arama, mehter arama melodisi (ya da kendi ses dosyan), cevapsız arama kaydı |
 | ✅ | Ses efektleri: ses kanalında ya da aramada herkese çalan korna, alkış, ba-dum-tıss… |
 | ✅ | Yapay zekâ gürültü engelleme (RNNoise), giriş hassasiyeti, yankı engelleme, bas-konuş |

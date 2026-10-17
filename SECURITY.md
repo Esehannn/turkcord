@@ -33,27 +33,36 @@ Bir güvenlik açığı bulursan lütfen herkese açık bir issue açma. GitHub'
 
 **Sesli sohbet**
 
-- Ses katılımcılar arasında uçtan uca şifreli (WebRTC/DTLS-SRTP) akar ve yalnızca Cloudflare'in aktarma (TURN)
-  sunucusundan geçer; Supabase'ten geçmez. Cloudflare şifreli paketleri iletir, içeriğini çözemez.
-- Doğrudan (P2P) bağlantı kurulmaz (`iceTransportPolicy: 'relay'`): uygulama yerel ya da genel IP adresini karşı tarafa
-  hiç bildirmez, kanaldaki kişiler birbirinin değil Cloudflare'in adresini görür. Aktarma sunucusuna ulaşılamazsa
-  kanala girilmez; doğrudan bağlantıya geri dönülmez.
-- Bağlantı bilgisi (sinyal) sadece o ses kanalına erişimi olanlar arasında, korumalı Realtime kanallarında paylaşılır.
-  Herkes yalnızca kendi konusuna (`sinyal:{kanal}:{kullanıcı}`) yazabilir; bunu veritabanı zorlar. Bir sinyalin kimden
-  geldiğini mesajın içeriği değil, geldiği konu belirler: kimse başkası adına bağlantı kuramaz, durum ya da efekt
-  gönderemez.
-- Ses ve görüntü bağlantısı yalnızca kanalda görünen (katılımcı listesindeki) kişilerle kurulur: yalnızca
-  listedekilerin konusu dinlenir, listeden çıkanın bağlantısı hemen kapanır. Kimin dinlediği ve izlediği her zaman
-  listede görünür.
+- Ses ve görüntü odanın sunucusu (Cloudflare Realtime SFU) üzerinden akar: herkes Cloudflare'e tek bir şifreli
+  (WebRTC/DTLS-SRTP) bağlantı kurar, sesini bir kez gönderir, odadakilerin sesini oradan çeker. Supabase'ten geçmez.
+  Ses yolda şifrelidir; ama Cloudflare sunucusunda dağıtılmak üzere çözülür, yani uçtan uca şifreli değildir
+  (Discord'da da böyledir). Cloudflare teknik olarak sesi ve görüntüyü görebilir.
+- Kanaldakiler birbirine bağlanmaz: kimse başkasının IP adresini görmez, adresi yalnızca Cloudflare görür. UDP'nin
+  kapalı olduğu ağlarda bağlantı Cloudflare'in aktarma (TURN) sunucusu üzerinden kurulur.
+- Cloudflare'le yalnızca `oda` Edge Function'ı konuşur; uygulama anahtarı (App Secret) orada durur. Uygulama başkasının
+  Cloudflare oturum kimliğini hiç görmez, kişiyi kullanıcı kimliğiyle ister. Bir sesi ya da görüntüyü yalnızca o
+  kanalda kayıtlı oturumu olan ve kanala erişimi süren biri çekebilir; çekilen de aynı kanalda olmalıdır. Oturum
+  kayıtları (`private.voice_sessions`) uygulamaya kapalıdır, yalnızca bu fonksiyonun çağırdığı veritabanı işlevleri yazar.
+- Susturma durumu, ses efektleri ve görüntü istekleri korumalı Realtime kanallarında gider. Herkes yalnızca kendi
+  konusuna (`sinyal:{kanal}:{kullanıcı}`) yazabilir; bunu veritabanı zorlar. Bir olayın kimden geldiğini mesajın içeriği
+  değil, geldiği konu belirler: kimse başkası adına durum ya da efekt gönderemez.
+- Uygulama yalnızca kanalda görünen (katılımcı listesindeki) kişilerin sesini çeker ve onların olaylarını işler.
+  Biri ses oturumu açınca veritabanı bunu `oda:{kanal}` konusuna duyurur (bu konuya kimse yazamaz); duyurulan kişi
+  listede görünmüyorsa odadakilere "listede görünmeden bağlandı" uyarısı çıkar.
+- Bilinen sınır: odaya normal girip sonra katılımcı listesinden kendini gizleyen (değiştirilmiş bir istemci kullanan)
+  biri, Cloudflare'deki bağlantısını kapatmadığı sürece dinlemeye devam edebilir. Sesi Cloudflare dağıttığı için
+  yayıncı bunu engelleyemez; 0.8.0'daki kişiden kişiye düzende bu mümkün değildi. Kanaldan çıkarılan ya da sunucudan
+  atılan biri yeni bir şey çekemez.
 - Bilinen sınır: katılımcı listesi (presence) kişinin kendi bildirdiği kimliğe dayanır. Kanala erişimi olan biri,
-  değiştirilmiş bir istemciyle listede başka bir üye gibi görünebilir; ama o üyenin konusuna yazamadığı için onun
-  adına bağlantı kuramaz, yani bu yolla ses ya da görüntü alamaz.
+  değiştirilmiş bir istemciyle listede başka bir üye gibi görünebilir; ama o üyenin oturumunu kullanamaz, onun adına
+  durum ya da efekt gönderemez.
 - 0.7.0 ve öncesi sürümler eski düzeni kullanırdı (doğrudan bağlantı, ortak sinyal konusu). O konunun veritabanı
   yetkisi kaldırıldı: bu sürümler, uygulama değiştirilse bile, sesli sohbete bağlanamaz.
-- İsteğe bağlı asgari sürüm (`MIN_APP_VERSION`): sunucu, daha eski sürüme aktarma bilgisi vermez ve uygulama
+- 0.8.0 kişiden kişiye bağlanırdı; 0.9.0 ve sonrasıyla birbirlerini duyamazlar (listede "ESKİ" görünür).
+- İsteğe bağlı asgari sürüm (`MIN_APP_VERSION`): sunucu, daha eski sürüme bağlantı bilgisi vermez ve uygulama
   güncelleme ister. Sürümü uygulama kendi bildirdiği için bu, değiştirilmiş bir istemciye karşı koruma değildir;
   güncellemeyi erteleyen kullanıcıyı günceller.
-- Cloudflare TURN bilgisi sunucu tarafında kısa ömürlü olarak üretilir; API anahtarı Supabase'in gizli ayarlarında durur.
+- Cloudflare TURN bilgisi sunucu tarafında kısa ömürlü olarak üretilir; Cloudflare anahtarları Supabase'in gizli ayarlarında durur.
 - Bireysel aramalar sadece özel mesajın iki tarafı arasında başlatılabilir; engelleme varsa arama yapılamaz. Arama
   kayıtlarını (`calls`) sadece taraflar görür ve durumları sadece sunucudaki fonksiyonlar değiştirir (dakikada en fazla 6 arama).
 - Ses efektlerinde ses verisi gönderilmez, sadece "şu efekti çal" sinyali gider; alıcı sadece bilinen efekt adlarını,
@@ -78,8 +87,8 @@ Bir güvenlik açığı bulursan lütfen herkese açık bir issue açma. GitHub'
 - Yalnızca mikrofon, kamera ve ekran paylaşımı izinleri verilir; konum gibi diğer izinler reddedilir.
 - Ekran yakalama yalnızca kullanıcının uygulamanın kendi seçim penceresinde seçtiği ekrana ya da pencereye verilir.
   Seçim tek kullanımlıktır; seçim yapılmadan gelen yakalama isteği ana süreçte reddedilir.
-- Görüntü (kamera, ekran) de ses gibi uçtan uca şifreli olarak yalnızca Cloudflare aktarma sunucusundan geçer ve
-  yalnızca izlemek isteyen kişiye gönderilir.
+- Görüntü (kamera, ekran) de ses gibi yalnızca Cloudflare'den geçer. Yayıncı görüntüsünü ancak biri izlemek isteyince
+  gönderir ve onu yalnızca aynı kanalda oturumu olan biri çekebilir.
 - Her yerde çalışan kısayollar sadece kullanıcının seçtiği tuş kombinasyonlarını dinler (tuş kaydı yapılmaz);
   ana süreç sadece `Ctrl/Alt/Shift + harf/rakam/F tuşu` biçimindeki kısayolları kabul eder.
 - Güncellemeler sadece bu reponun GitHub Releases sayfasından (HTTPS) indirilir; kurulumdan önce dosyanın SHA-512

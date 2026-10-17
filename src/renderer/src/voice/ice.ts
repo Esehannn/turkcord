@@ -1,11 +1,10 @@
-// Ses ve görüntü yalnızca Cloudflare'in aktarma (TURN) sunucusundan geçer; doğrudan (P2P) bağlantı kurulmaz.
-// Böylece kanaldaki kişiler birbirinin IP adresini değil, Cloudflare'inkini görür. Aktarma bilgisi yoksa
-// bağlantı hiç kurulmaz; doğrudan bağlantıya geri dönülmez.
+// Ses ve görüntü yalnızca Cloudflare'e gider: odanın sunucusuna (SFU) doğrudan, UDP kapalıysa Cloudflare'in aktarma
+// (TURN) sunucusu üzerinden. Kanaldakiler birbirine bağlanmaz; kimse başkasının IP adresini görmez, adresi yalnızca
+// Cloudflare görür. Bağlantı bilgisi (SDP) de yalnızca "oda" Edge Function'ı üzerinden Cloudflare'e gider.
 
 export type IceServer = { urls: string[]; username: string; credential: string }
 
-// Sunucudan gelen listeden yalnızca kimlik bilgisi olan TURN adreslerini bırakır. STUN alınmaz: tek işi kendi
-// adresimi öğrenip karşıya bildirmektir.
+// Sunucudan gelen listeden yalnızca kimlik bilgisi olan TURN adreslerini bırakır.
 export function relayServers(list: unknown): IceServer[] {
   if (!Array.isArray(list)) return []
   const servers: IceServer[] = []
@@ -17,7 +16,7 @@ export function relayServers(list: unknown): IceServer[] {
   return servers
 }
 
-// iceTransportPolicy 'relay': tarayıcı yerel ve genel adres adaylarını hiç üretmez, karşıya yalnızca aktarma adresi gider.
-export function relayConfig(servers: IceServer[]): { iceServers: IceServer[]; iceTransportPolicy: 'relay' } {
-  return { iceServers: servers, iceTransportPolicy: 'relay' }
+// Karşı taraf her zaman Cloudflare olduğu için doğrudan bağlantıya izin verilir; aktarma yedektir.
+export function rtcConfig(servers: IceServer[]): { iceServers: IceServer[]; iceTransportPolicy: 'all' } {
+  return { iceServers: servers, iceTransportPolicy: 'all' }
 }

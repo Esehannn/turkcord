@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Megaphone, PhoneOff, Signal } from 'lucide-react'
+import { Megaphone, PhoneOff } from 'lucide-react'
 import { IconButton } from '@/components/ui'
 import { useChannels, useProfile, useProfiles, useServers } from '@/data/queries'
 import { clock } from '@/lib/files'
@@ -12,7 +12,7 @@ import { leaveVoice, sendEffect } from '@/voice/engine'
 import { useVoice } from '@/voice/store'
 import { rememberedChannel } from '@/features/layout/ServerRail'
 import { useCallSeconds } from './CallBar'
-import { linkTitle, pingClass } from './Ping'
+import { linkTitle, pingClass, SignalBars } from './Ping'
 
 // Ses kanalına ya da bir aramaya bağlıyken kullanıcı panelinin üstünde görünen bağlantı kutusu.
 export function VoicePanel() {
@@ -20,7 +20,8 @@ export function VoicePanel() {
   const channelId = useVoice((s) => s.channelId)
   const serverId = useVoice((s) => s.serverId)
   const peers = useVoice((s) => s.peers)
-  const links = useVoice((s) => s.links)
+  const link = useVoice((s) => s.link)
+  const reconnecting = useVoice((s) => s.reconnecting)
   const inputMode = useVoice((s) => s.inputMode)
   const pttKey = useVoice((s) => s.pttKey)
   const pttDown = useVoice((s) => s.pttDown)
@@ -31,6 +32,7 @@ export function VoicePanel() {
   const callPeer = useProfile(call?.peerId)
   const callSeconds = useCallSeconds(call)
   const [board, setBoard] = useState(false)
+  const { data: profiles } = useProfiles()
 
   if (status === 'idle' || !channelId) return null
   const inCall = !serverId
@@ -38,25 +40,27 @@ export function VoicePanel() {
   const server = servers?.find((s) => s.id === serverId)
 
   const states = Object.values(peers)
-  const trouble = states.some((s) => s === 'failed' || s === 'disconnected')
-  const pending = status === 'connecting' || states.some((s) => s === 'new' || s === 'connecting')
+  const lostIds = Object.keys(peers).filter((id) => peers[id] === 'lost')
+  const lost = lostIds.length
+  const trouble = reconnecting || lost > 0
+  const pending = status === 'connecting' || states.some((s) => s === 'connecting')
   const ringing = inCall && call?.status === 'ringing'
   const label = ringing
     ? 'Aranıyor…'
     : status === 'connecting'
       ? 'Bağlanıyor…'
-      : trouble
-        ? 'Bağlantı sorunu'
-        : pending
-          ? 'Bağlanıyor…'
-          : inCall
-            ? `Aramada · ${clock(callSeconds ?? 0)}`
-            : 'Ses bağlı'
+      : reconnecting
+        ? 'Yeniden bağlanıyor…'
+        : lost
+          ? 'Ses sorunu'
+          : pending
+            ? 'Bağlanıyor…'
+            : inCall
+              ? `Aramada · ${clock(callSeconds ?? 0)}`
+              : 'Ses bağlı'
   const color = trouble ? 'text-idle' : pending || ringing ? 'text-muted' : 'text-online'
-  // Gösterilen ping: odadakilerle aramdaki en yüksek gecikme (sesi en geç giden kişi).
-  const linkList = Object.values(links).filter((l) => l.ping !== null)
-  const worst = linkList.length ? Math.max(...linkList.map((l) => l.ping!)) : null
-  const tooltip = linkList.length ? Object.values(links).map(linkTitle).join('\n') : 'Odada başka kimse yok'
+  // Gösterilen ping: Cloudflare'in ses sunucusuna olan gecikmem (odadaki herkesin sesi bu yoldan geçer).
+  const ping = reconnecting ? null : (link?.ping ?? null)
 
   return (
     <div className="relative border-t border-line bg-sidebar">
@@ -69,11 +73,18 @@ export function VoicePanel() {
           data-tip={inCall ? 'Sohbete git' : 'Ses odasını aç'}
         >
           <span className={`flex items-center gap-1.5 text-sm font-semibold tabular-nums ${color}`}>
-            <Signal className="size-4" />
-            {label}
-            {!trouble && !pending && !ringing && worst !== null && (
-              <span className={`text-xs font-medium ${pingClass(worst)}`} data-tip={tooltip}>
-                · {worst} ms
+            <span data-tip={linkTitle(link)} className={ping !== null && !trouble ? pingClass(ping) : undefined}>
+              <SignalBars ping={status === 'connected' ? ping : null} />
+            </span>
+            <span
+              className={`truncate ${pending || reconnecting ? 'animate-pulse' : ''}`}
+              data-tip={lost ? `Sesi gelmiyor: ${lostIds.map((id) => profiles?.get(id)?.display_name ?? 'Biri').join(', ')}. Yeniden bağlanılıyor.` : undefined}
+            >
+              {label}
+            </span>
+            {!trouble && !pending && !ringing && ping !== null && (
+              <span className={`text-xs font-medium ${pingClass(ping)}`} data-tip={linkTitle(link)}>
+                · {ping} ms
               </span>
             )}
           </span>

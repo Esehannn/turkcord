@@ -15,11 +15,11 @@ import { useVoice, type VoiceParticipant } from './store'
 
 export type VoiceFlags = { muted: boolean; deafened: boolean; screen?: boolean; camera?: boolean; at: number }
 // since: kanala giriş anı; "seste geçen süre" bundan hesaplanır.
-// v: sinyal düzeninin sürümü. 0.7.0 ve öncesi bildirmez; onlar eski düzeni (ortak "ses:{kanal}" konusu) kullanır.
+// v: ses düzeninin sürümü. Farklı düzendekiler birbirini duyamaz; listede "ESKİ" görünür.
 type Meta = Partial<VoiceFlags> & { since?: number; v?: number }
 
-// 2: herkes yalnızca kendi konusuna yazar ("sinyal:{kanal}:{kullanıcı}", bkz. engine.ts).
-const SIGNAL_VERSION = 2
+// 2: herkes yalnızca kendi konusuna yazar ("sinyal:{kanal}:{kullanıcı}"). 3: ses odası sunucusu (Cloudflare SFU, bkz. sfu.ts).
+const SIGNAL_VERSION = 3
 
 const TRACK_EVERY_MS = 12_000
 const MAX_REVIVES = 5

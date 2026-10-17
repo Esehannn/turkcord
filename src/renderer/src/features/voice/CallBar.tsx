@@ -33,7 +33,8 @@ export function CallBar({ call, me }: { call: ActiveCall; me: string }) {
   const deafened = useVoice((s) => s.deafened)
   const room = useVoice((s) => s.rooms[call.channelId])
   const peerState = useVoice((s) => s.peers[call.peerId])
-  const link = useVoice((s) => s.links[call.peerId])
+  const link = useVoice((s) => s.link)
+  const reconnecting = useVoice((s) => s.reconnecting)
   const seconds = useCallSeconds(call)
   const localCamera = useVoice((s) => s.localCamera)
   const localScreen = useVoice((s) => s.localScreen)
@@ -45,6 +46,8 @@ export function CallBar({ call, me }: { call: ActiveCall; me: string }) {
 
   let status: string
   if (call.status === 'ringing') status = call.direction === 'out' ? `${peerName} aranıyor…` : `${peerName} seni arıyor`
+  else if (reconnecting) status = 'Yeniden bağlanıyor…'
+  else if (peerState === 'lost') status = 'Sesi gelmiyor, yeniden bağlanılıyor…'
   else if (!peerInRoom || peerState !== 'connected') status = 'Bağlanıyor…'
   else status = clock(seconds ?? 0)
 
