@@ -21,7 +21,9 @@ export function VoicePanel() {
   const serverId = useVoice((s) => s.serverId)
   const peers = useVoice((s) => s.peers)
   const link = useVoice((s) => s.link)
-  const reconnecting = useVoice((s) => s.reconnecting)
+  // Cloudflare bağlantısı yeniden kuruluyor ya da kanalın listesinde görünmüyorum (yeniden bildiriliyor).
+  const reconnecting = useVoice((s) => s.reconnecting || s.unlisted)
+  const uplinkLimited = useVoice((s) => s.uplinkLimited && !!s.localScreen)
   const inputMode = useVoice((s) => s.inputMode)
   const pttKey = useVoice((s) => s.pttKey)
   const pttDown = useVoice((s) => s.pttDown)
@@ -91,6 +93,11 @@ export function VoicePanel() {
           <span className="block truncate text-xs text-muted">
             {inCall ? (callPeer?.display_name ?? 'Sesli arama') : `${channel?.name ?? 'Ses kanalı'} / ${server?.name ?? ''}`}
           </span>
+          {uplinkLimited && (
+            <span className="mt-0.5 block text-[11px] font-medium text-idle" data-tip="Paylaşımı daha düşük kaliteyle yeniden başlatmayı dene.">
+              İnternetin yayına yetmiyor
+            </span>
+          )}
           {inputMode === 'bas-konus' && (
             <span className={`mt-0.5 block text-[11px] font-medium ${pttDown ? 'text-online' : 'text-faint'}`}>
               {pttDown ? 'Konuşuyorsun' : `Konuşmak için ${keyLabel(pttKey)} tuşuna basılı tut`}

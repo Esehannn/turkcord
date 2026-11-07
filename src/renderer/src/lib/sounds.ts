@@ -218,7 +218,8 @@ const NOTIFY = {
   ),
 } satisfies Record<string, Score>
 
-// Ses kanalı işaretleri: giriş (Mi → Si), çıkış (Si → Mi), mikrofon kapat / aç (pes / tiz tek vuruş), bas-konuş.
+// Ses kanalı işaretleri: giriş (Mi → Si), çıkış (Si → Mi), mikrofon kapat / aç (pes / tiz tek vuruş), bas-konuş,
+// kanalda yayın açıldı.
 const VOICE_CUES = {
   join: motif(
     [
@@ -238,6 +239,16 @@ const VOICE_CUES = {
   unmute: motif([[0, B4, 0.16]], 0.14, 3200),
   pttOn: motif([[0, B4, 0.1]], 0.06, 3200),
   pttOff: motif([[0, G4, 0.1]], 0.05, 3200),
+  // Yayın açıldı: marşın açılışı gibi yükselen Mi · Sol · Si · Mi (yumuşak, kısa).
+  stream: motif(
+    [
+      [0, E4, 0.12],
+      [0.09, G4, 0.12],
+      [0.18, B4, 0.12],
+      [0.27, E5, 0.4],
+    ],
+    0.16,
+  ),
 } satisfies Record<string, Score>
 
 export type VoiceCue = keyof typeof VOICE_CUES

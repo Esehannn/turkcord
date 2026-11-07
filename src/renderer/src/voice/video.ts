@@ -16,6 +16,15 @@ import { useVoice } from './store'
 // Görüntüyü kimin çekebileceğini "oda" Edge Function'ı denetler (aynı kanalda oturumu olan).
 //
 // Yalnızca kanalda görünen (katılımcı listesindeki) kişilerin olayları işlenir.
+//
+// Sağlamlık (bekçi, her 2 sn; yalnızca bir şey izlenirken ya da yayınlanırken çalışır):
+//  - İzlenmek istenen ama gelmeyen görüntü, gelene kadar giderek seyrelen aralıklarla yeniden istenir
+//    (yayın "açılmıyor" diye takılı kalmaz).
+//  - Gelen görüntünün paketleri bir süre durursa (yayın donduysa) görüntü yeniden istenir.
+//  - Biri listeden kısa süre düşerse (Supabase bağlantısı kopup geldi) yayın hemen kapatılmaz: izleyici yayını,
+//    yayıncı da izleyicisini bir süre bekler. Kişi geri gelince kaldığı yerden sürer.
+//  - Görüntü bağlantısı bir süre kopuk kalırsa oturum baştan kurulur.
+//  - Yayıncının yükleme hızı seçilen kaliteye yetmiyorsa uyarılır.
 
 export type VideoKind = 'screen' | 'camera'
 export type ScreenQuality = '720p30' | '1080p30' | '720p60' | '1080p60'
@@ -37,12 +46,23 @@ const QUALITY: Record<ScreenQuality, { width: number; height: number; fps: numbe
   '1080p60': { width: 1920, height: 1080, fps: 60, bitrate: 7_000_000 },
 }
 const CAMERA = { width: 960, height: 540, fps: 30, bitrate: 900_000 }
-// "izle" dedikten sonra bu sürede görüntü gelmezse bir kez daha istenir.
-const RETRY_MS = 6000
+const TICK_MS = 2000
+// "izle" dedikten sonra görüntü gelmezse yeniden istenir: 4, 8, 16 sn… en fazla bu kadar arayla, vazgeçmeden.
+const ASK_FIRST_MS = 4000
+const ASK_MAX_MS = 20_000
+// Gelen görüntünün paketleri bu kadar süre durursa (yayın dondu) görüntü yeniden istenir. Durağan bir ekranda bile
+// tarayıcı saniyede bir yenileme karesi gönderir; bu süre boyunca hiç paket gelmemesi yayının koptuğunu gösterir.
+const STALL_MS = 12_000
+// Listeden düşen birini (yayıncı ya da izleyici) bu kadar süre bekle; geri gelmezse yayın bırakılır.
+const ABSENT_GRACE_MS = 25_000
+// Görüntü bağlantısı bu kadar süre kopuk kalırsa oturum baştan kurulur.
+const LOST_MS = 5000
 // Son izleyen de bırakınca yayın bu kadar süre sonra durur (hemen geri dönen için yeniden yayınlamamak adına).
 const IDLE_PUBLISH_MS = 10_000
 // Ne izlenen ne yayınlanan bir şey kalınca görüntü oturumu bu kadar süre sonra kapanır.
 const IDLE_SESSION_MS = 20_000
+// Yükleme hızı bu kadar süre art arda yetmezse yayıncı uyarılır (yayının ilk saniyelerindeki ısınma sayılmasın diye uzun).
+const UPLINK_WARN_MS = 20_000
 
 type Signal = { type: 'izle' | 'birak' | 'yayinda'; to: string; kind: VideoKind } | { type: 'bitti'; kind: VideoKind }
 
@@ -52,16 +72,31 @@ let wiring: Wiring | null = null
 let session: SfuSession | null = null
 let opening: Promise<SfuSession | null> | null = null
 let sessionIdle: ReturnType<typeof setTimeout> | undefined
+let sessionDownSince = 0
+let ticker: ReturnType<typeof setInterval> | undefined
 // Benim yayınlarımı izleyenler ve yayının Cloudflare'e gönderilişi.
 const watchers: Record<VideoKind, Set<string>> = { screen: new Set(), camera: new Set() }
 const publishing: Partial<Record<VideoKind, Promise<boolean>>> = {}
 const publishIdle: Partial<Record<VideoKind, ReturnType<typeof setTimeout>>> = {}
-// Benim izlediklerim: `${yayıncı}:${tür}` → çekilen izler ve onlardan kurulan akış.
-const incoming = new Map<string, { mids: string[]; stream: MediaStream }>()
+// Benim izlediklerim: `${yayıncı}:${tür}` → çekilen izler, görüntü izinin mid'i, ondan kurulan akış ve paket sayacı.
+type Incoming = { mids: string[]; videoMid: string | null; stream: MediaStream; packets: number; changedAt: number }
+const incoming = new Map<string, Incoming>()
+// İzlemek isteyip henüz görüntüsü gelmeyenler: bir sonraki istek zamanı ve kaçıncı deneme.
+const asks = new Map<string, { at: number; tries: number }>()
+// Listeden düşenler (kişi → ilk görünmediği an). Bekleme süresi dolana kadar yayınları/izlemeleri sürer.
+const absent = new Map<string, number>()
 let screenBitrate = QUALITY['720p30'].bitrate
 let screenFps = 30
+let uplinkLimitedSince = 0
+let uplinkOkSince = 0
+let uplinkWarned = false
 
 export const videoKey = (userId: string, kind: VideoKind): string => `${userId}:${kind}`
+
+function splitKey(key: string): [string, VideoKind] {
+  const split = key.lastIndexOf(':')
+  return [key.slice(0, split), key.slice(split + 1) as VideoKind]
+}
 
 const trackNames = (kind: VideoKind): TrackName[] => (kind === 'screen' ? ['ekran', 'ekran-ses'] : ['kamera'])
 
@@ -83,6 +118,15 @@ function setRemote(key: string, stream: MediaStream | null | undefined): void {
   })
 }
 
+// Ekranımı kaç kişi izliyor (kanaldakilere duyurulur).
+export function viewerCount(): number {
+  return localStream('screen') ? watchers.screen.size : 0
+}
+
+function watchersChanged(kind: VideoKind): void {
+  if (kind === 'screen') wiring?.onLocalChange()
+}
+
 // ---------------------------------------------------------------------------
 // Görüntü oturumu
 // ---------------------------------------------------------------------------
@@ -96,16 +140,23 @@ function onTrack(userId: string, name: TrackName, track: MediaStreamTrack): void
 }
 
 function onState(state: RTCPeerConnectionState): void {
-  if (state !== 'failed' || !session) return
-  // Bağlantı koptu: oturum baştan kurulur; izlenenler yeniden istenir, izlenen yayınlar yeniden gönderilir.
+  if (state === 'connected') sessionDownSince = 0
+  else if (state === 'disconnected') sessionDownSince ||= Date.now()
+  else if (state === 'failed') rebuildSession()
+}
+
+// Bağlantı koptu: oturum baştan kurulur; izlenenler yeniden istenir, izlenen yayınlar yeniden gönderilir.
+function rebuildSession(): void {
+  if (!session) return
   const dead = session
   session = null
+  sessionDownSince = 0
   void dead.end()
   for (const key of [...incoming.keys()]) {
     incoming.delete(key)
-    setRemote(key, null)
-    const split = key.lastIndexOf(':')
-    request(key.slice(0, split), key.slice(split + 1) as VideoKind)
+    // Son kare ekranda kalır; yeni görüntü gelince değişir.
+    const [userId, kind] = splitKey(key)
+    request(userId, kind)
   }
   for (const kind of ['screen', 'camera'] as const) {
     delete publishing[kind]
@@ -128,6 +179,7 @@ function ensureSession(): Promise<SfuSession | null> {
         return null
       }
       session = next
+      sessionDownSince = 0
       return next
     })
     .catch(() => {
@@ -144,11 +196,14 @@ function ensureSession(): Promise<SfuSession | null> {
 function maybeIdle(): void {
   clearTimeout(sessionIdle)
   sessionIdle = setTimeout(() => {
-    const busy = incoming.size > 0 || watchers.screen.size > 0 || watchers.camera.size > 0 || !!publishing.screen || !!publishing.camera
-    if (busy || !session) return
+    if (busy() || !session) return
     void session.end()
     session = null
   }, IDLE_SESSION_MS)
+}
+
+function busy(): boolean {
+  return incoming.size > 0 || asks.size > 0 || watchers.screen.size > 0 || watchers.camera.size > 0 || !!publishing.screen || !!publishing.camera
 }
 
 // ---------------------------------------------------------------------------
@@ -178,6 +233,7 @@ async function serve(kind: VideoKind): Promise<void> {
   })().catch(() => false)
   const ok = await publishing[kind]
   if (!ok) {
+    // Gönderilemedi; izleyici yeniden isteyince tekrar denenir.
     delete publishing[kind]
     return
   }
@@ -210,6 +266,7 @@ function stopLocal(kind: VideoKind, announce = true): void {
   }
   watchers[kind].clear()
   void unpublish(kind)
+  if (kind === 'screen') resetUplink()
   useVoice.setState(kind === 'screen' ? { localScreen: null } : { localCamera: null })
   if (announce && wiring) {
     send({ type: 'bitti', kind })
@@ -301,6 +358,7 @@ export async function startScreen(sourceId: string, quality: ScreenQuality, with
   for (const track of stream.getVideoTracks()) track.contentHint = 'motion'
   screenBitrate = q.bitrate
   screenFps = q.fps
+  resetUplink()
   publishLocal('screen', stream)
   return true
 }
@@ -309,25 +367,53 @@ export function stopScreen(): void {
   stopLocal('screen')
 }
 
+function resetUplink(): void {
+  uplinkLimitedSince = 0
+  uplinkOkSince = 0
+  uplinkWarned = false
+  if (useVoice.getState().uplinkLimited) useVoice.setState({ uplinkLimited: false })
+}
+
+// Yayınımın görüntüsü internetim yüzünden kısılıyor mu? (Tarayıcı bunu "qualityLimitationReason" ile bildirir.)
+async function checkUplink(s: SfuSession): Promise<void> {
+  const report = await s.pc.getStats().catch(() => null)
+  if (!report) return
+  let limited = false
+  report.forEach((r: { type: string; kind?: string; qualityLimitationReason?: string; bytesSent?: number }) => {
+    if (r.type === 'outbound-rtp' && r.kind === 'video' && r.qualityLimitationReason === 'bandwidth' && (r.bytesSent ?? 0) > 0) limited = true
+  })
+  // Kameram da bu oturumdan gider; ekran paylaşmıyorsam uyarı gerekmez.
+  if (!localStream('screen') || !publishing.screen) return resetUplink()
+  const now = Date.now()
+  if (limited) {
+    uplinkOkSince = 0
+    uplinkLimitedSince ||= now
+    if (now - uplinkLimitedSince >= UPLINK_WARN_MS && !useVoice.getState().uplinkLimited) {
+      useVoice.setState({ uplinkLimited: true })
+      if (!uplinkWarned) {
+        uplinkWarned = true
+        toast.info('İnternetinin yükleme hızı bu yayın kalitesine yetmiyor; yayın bulanıklaşabilir ya da takılabilir. Paylaşımı daha düşük kaliteyle yeniden başlatmayı dene.')
+      }
+    }
+  } else {
+    uplinkLimitedSince = 0
+    uplinkOkSince ||= now
+    if (now - uplinkOkSince >= UPLINK_WARN_MS && useVoice.getState().uplinkLimited) useVoice.setState({ uplinkLimited: false })
+  }
+}
+
 // ---------------------------------------------------------------------------
 // İzleyici tarafı
 // ---------------------------------------------------------------------------
 
-const pendingRetries = new Map<string, ReturnType<typeof setTimeout>>()
-
+// "izle" gönderir ve görüntü gelmezse bir sonraki isteği zamanlar (bekçi gönderir).
 function request(userId: string, kind: VideoKind): void {
   if (!wiring) return
   const key = videoKey(userId, kind)
   send({ type: 'izle', to: userId, kind })
-  // Görüntü gelmezse (ör. yayıncı isteği kaçırdıysa) bir kez daha istenir.
-  clearTimeout(pendingRetries.get(key))
-  pendingRetries.set(
-    key,
-    setTimeout(() => {
-      const { videos } = useVoice.getState()
-      if (wiring && key in videos && !videos[key]) send({ type: 'izle', to: userId, kind })
-    }, RETRY_MS),
-  )
+  const tries = (asks.get(key)?.tries ?? 0) + 1
+  asks.set(key, { tries, at: Date.now() + Math.min(ASK_MAX_MS, ASK_FIRST_MS * 2 ** (tries - 1)) })
+  ensureTicker()
 }
 
 // Bir kişinin ekranını ya da kamerasını izlemeye başlar. Görüntü gelene kadar `videos[anahtar]` null kalır.
@@ -335,18 +421,38 @@ export function watch(userId: string, kind: VideoKind): void {
   const key = videoKey(userId, kind)
   if (!wiring || userId === wiring.me || key in useVoice.getState().videos) return
   setRemote(key, null)
+  asks.delete(key)
   request(userId, kind)
   // Yayıncı hazırlanırken görüntü oturumum da açılsın; "yayinda" gelince hemen çekilir.
   void ensureSession()
 }
 
-// Karşı taraf beni dinlemeye yeni başladıysa, ondan istediğim ama henüz gelmeyen görüntüler yeniden istenir
+// Kanala girilirken "izle" denirse (kenar çubuğundaki "İzle", "yayın açtı" bildirimi) bağlantı kurulunca izlenir.
+export function watchWhenReady(channelId: string, userId: string): void {
+  const ready = (): boolean => {
+    const s = useVoice.getState()
+    return !!wiring && s.channelId === channelId && s.status === 'connected'
+  }
+  if (ready()) return watch(userId, 'screen')
+  const stop = useVoice.subscribe(() => {
+    if (!ready()) return
+    stop()
+    clearTimeout(timer)
+    watch(userId, 'screen')
+  })
+  const timer = setTimeout(stop, 30_000)
+}
+
+// Karşı taraf beni dinlemeye yeni başladıysa, ondan istediğim ama henüz gelmeyen görüntüler hemen yeniden istenir
 // (ilk istek o dinlemeye başlamadan gitmiş olabilir).
 export function retryVideo(userId: string): void {
   const { videos } = useVoice.getState()
   for (const kind of ['screen', 'camera'] as const) {
     const key = videoKey(userId, kind)
-    if (key in videos && !videos[key]) request(userId, kind)
+    if (key in videos && !incoming.has(key)) {
+      asks.delete(key)
+      request(userId, kind)
+    }
   }
 }
 
@@ -358,8 +464,7 @@ export function unwatch(userId: string, kind: VideoKind): void {
 }
 
 function dropIncoming(key: string): void {
-  clearTimeout(pendingRetries.get(key))
-  pendingRetries.delete(key)
+  asks.delete(key)
   const entry = incoming.get(key)
   incoming.delete(key)
   if (entry?.mids.length && session && !session.isClosed) void session.drop(entry.mids).catch(() => {})
@@ -371,7 +476,7 @@ const SCREEN_AUDIO_RETRY_MS = 4000
 const SCREEN_AUDIO_TRIES = 30
 
 // Ekran paylaşımının sesini, görüntü izlendiği sürece (en fazla ~2 dakika) aralıklarla yeniden ister.
-async function pullScreenAudio(from: string, entry: { mids: string[]; stream: MediaStream }): Promise<void> {
+async function pullScreenAudio(from: string, entry: Incoming): Promise<void> {
   const key = videoKey(from, 'screen')
   for (let i = 0; i < SCREEN_AUDIO_TRIES; i++) {
     await new Promise((r) => setTimeout(r, SCREEN_AUDIO_RETRY_MS))
@@ -397,24 +502,100 @@ async function pull(from: string, kind: VideoKind): Promise<void> {
   if (!s || !(key in useVoice.getState().videos)) return
   const old = incoming.get(key)
   if (old?.mids.length) await s.drop(old.mids).catch(() => {})
-  const entry = { mids: [] as string[], stream: new MediaStream() }
+  const entry: Incoming = { mids: [], videoMid: null, stream: new MediaStream(), packets: 0, changedAt: Date.now() }
   incoming.set(key, entry)
   try {
     const results = await s.pull(trackNames(kind).map((name) => ({ user: from, name })))
     entry.mids = results.flatMap((r) => (r.mid ? [r.mid] : []))
+    entry.videoMid = results.find((r) => r.mid && r.name !== 'ekran-ses')?.mid ?? null
+    entry.changedAt = Date.now()
     // Görüntü izi yoksa (yayın tam o an bitti ya da henüz hazır değil) biraz sonra yeniden istenir.
-    if (!results.some((r) => r.mid && r.name !== 'ekran-ses')) throw new Error('görüntü yok')
-    clearTimeout(pendingRetries.get(key))
-    pendingRetries.delete(key)
+    if (!entry.videoMid) throw new Error('görüntü yok')
+    asks.delete(key)
     // Paylaşılan ekranda henüz ses çalmıyorsa Cloudflare o izi tanımaz; ses başlayınca çekilsin diye yeniden denenir.
     if (results.some((r) => r.name === 'ekran-ses' && r.error === 'not_found')) void pullScreenAudio(from, entry)
   } catch {
     if (incoming.get(key) !== entry || !(key in useVoice.getState().videos)) return
     if (entry.mids.length) void s.drop(entry.mids).catch(() => {})
     incoming.delete(key)
-    setTimeout(() => {
-      if (key in useVoice.getState().videos && !incoming.has(key)) request(from, kind)
-    }, 3000)
+    const tries = asks.get(key)?.tries ?? 1
+    asks.set(key, { tries, at: Date.now() + 3000 })
+    ensureTicker()
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Bekçi
+// ---------------------------------------------------------------------------
+
+function ensureTicker(): void {
+  if (!ticker && wiring) ticker = setInterval(() => void tick(), TICK_MS)
+}
+
+async function tick(): Promise<void> {
+  if (!wiring) return
+  const now = Date.now()
+  const { channelId, rooms, videos } = useVoice.getState()
+  const room = new Map((rooms[channelId ?? ''] ?? []).map((p) => [p.userId, p]))
+
+  // Listeden düşüp geri gelmeyenler: izleyiciyse bırakılır, yayıncıysa izlemesi biter.
+  for (const [userId, since] of [...absent]) {
+    if (room.has(userId)) {
+      absent.delete(userId)
+      continue
+    }
+    if (now - since < ABSENT_GRACE_MS) continue
+    absent.delete(userId)
+    for (const kind of ['screen', 'camera'] as const) {
+      if (watchers[kind].delete(userId)) {
+        releaseIfUnwatched(kind)
+        watchersChanged(kind)
+      }
+      if (videoKey(userId, kind) in videos) dropIncoming(videoKey(userId, kind))
+    }
+  }
+
+  // Görüntü bağlantısı uzun süre kopuk: baştan kur.
+  if (session && sessionDownSince && now - sessionDownSince > LOST_MS) rebuildSession()
+
+  // Görüntüsü gelmeyenler yeniden istenir (yayıncı listede görünmüyorsa beklenir).
+  for (const [key, ask] of asks) {
+    if (incoming.has(key) || now < ask.at) continue
+    if (!(key in videos)) {
+      asks.delete(key)
+      continue
+    }
+    const [userId, kind] = splitKey(key)
+    if (room.has(userId)) request(userId, kind)
+  }
+
+  const s = session
+  if (s && !s.isClosed && (incoming.size || publishing.screen)) {
+    const stats = await s.stats().catch(() => null)
+    if (stats && session === s) {
+      for (const [key, entry] of [...incoming]) {
+        if (!entry.videoMid) continue
+        const packets = stats.packets.get(entry.videoMid) ?? 0
+        if (packets > entry.packets) {
+          entry.packets = packets
+          entry.changedAt = now
+        } else if (now - entry.changedAt > STALL_MS) {
+          // Yayın dondu: izi bırakıp yeniden iste (son kare ekranda kalır).
+          const [userId, kind] = splitKey(key)
+          incoming.delete(key)
+          void s.drop(entry.mids).catch(() => {})
+          asks.delete(key)
+          if (room.has(userId)) request(userId, kind)
+          else asks.set(key, { tries: 1, at: now })
+        }
+      }
+    }
+    if (publishing.screen) await checkUplink(s)
+  }
+
+  if (!busy() && !absent.size) {
+    clearInterval(ticker)
+    ticker = undefined
   }
 }
 
@@ -442,11 +623,15 @@ export async function onVideoSignal(from: string, payload: unknown): Promise<voi
     switch (message.type) {
       case 'izle':
         if (!localStream(kind)) return
-        watchers[kind].add(from)
+        if (!watchers[kind].has(from)) {
+          watchers[kind].add(from)
+          watchersChanged(kind)
+        }
+        ensureTicker()
         await serve(kind)
         break
       case 'birak':
-        watchers[kind].delete(from)
+        if (watchers[kind].delete(from)) watchersChanged(kind)
         releaseIfUnwatched(kind)
         break
       case 'yayinda':
@@ -465,28 +650,44 @@ export function startVideo(next: Wiring): void {
   wiring = next
 }
 
-// Kanaldan çıkanlar izleyicilerden düşer ve görüntüleri bırakılır; paylaşımı bitenlerin görüntüsü de bırakılır.
+// Paylaşımı bitenlerin görüntüsü bırakılır. Kanaldan çıkan biri hemen bırakılmaz: listeden kısa süre düşmüş
+// olabilir (bağlantısı kopup geldi); bekçi bekleme süresi dolunca bırakır.
 export function syncVideoRoom(): void {
   if (!wiring) return
   const { channelId, rooms, videos } = useVoice.getState()
   const room = new Map((rooms[channelId ?? ''] ?? []).map((p) => [p.userId, p]))
+  const now = Date.now()
+  const missing = (userId: string): void => {
+    if (!absent.has(userId)) absent.set(userId, now)
+    ensureTicker()
+  }
   for (const kind of ['screen', 'camera'] as const) {
-    for (const viewer of [...watchers[kind]]) if (!room.has(viewer)) watchers[kind].delete(viewer)
-    releaseIfUnwatched(kind)
+    for (const viewer of watchers[kind]) if (!room.has(viewer)) missing(viewer)
   }
   for (const key of Object.keys(videos)) {
-    const split = key.lastIndexOf(':')
-    const person = room.get(key.slice(0, split))
-    const kind = key.slice(split + 1) as VideoKind
-    if (!person || (kind === 'screen' ? person.screen === false : person.camera === false)) dropIncoming(key)
+    const [userId, kind] = splitKey(key)
+    const person = room.get(userId)
+    if (!person) {
+      missing(userId)
+      continue
+    }
+    if (absent.delete(userId) && !incoming.has(key)) {
+      // Geri geldi: görüntüsü kopmuşsa hemen yeniden iste.
+      asks.delete(key)
+      request(userId, kind)
+    }
+    if (kind === 'screen' ? person.screen === false : person.camera === false) dropIncoming(key)
   }
+  for (const userId of [...absent.keys()]) if (room.has(userId)) absent.delete(userId)
 }
 
 export function stopVideo(): void {
   stopLocal('screen', false)
   stopLocal('camera', false)
-  for (const timer of pendingRetries.values()) clearTimeout(timer)
-  pendingRetries.clear()
+  asks.clear()
+  absent.clear()
+  clearInterval(ticker)
+  ticker = undefined
   for (const kind of ['screen', 'camera'] as const) {
     clearTimeout(publishIdle[kind])
     delete publishing[kind]
@@ -496,6 +697,7 @@ export function stopVideo(): void {
   incoming.clear()
   void session?.end()
   session = null
+  sessionDownSince = 0
   opening = null
   wiring = null
   useVoice.setState({ videos: {}, localScreen: null, localCamera: null })

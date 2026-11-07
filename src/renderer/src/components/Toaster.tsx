@@ -18,6 +18,18 @@ export function Toaster() {
           >
             <Icon className={`mt-0.5 size-4 shrink-0 ${TONE[t.tone]}`} />
             <p className="flex-1 text-fg">{t.text}</p>
+            {t.action && (
+              <button
+                type="button"
+                onClick={() => {
+                  dismiss(t.id)
+                  t.action?.run()
+                }}
+                className="-my-0.5 shrink-0 rounded-md bg-accent px-2.5 py-0.5 text-xs font-semibold text-on-accent hover:opacity-90"
+              >
+                {t.action.label}
+              </button>
+            )}
             <button type="button" aria-label="Kapat" onClick={() => dismiss(t.id)} className="text-faint hover:text-fg">
               <X className="size-4" />
             </button>

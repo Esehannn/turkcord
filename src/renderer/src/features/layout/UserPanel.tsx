@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { Headphones, HeadphoneOff, Mic, MicOff, Settings } from 'lucide-react'
+import { Headphones, HeadphoneOff, Mic, MicOff, MonitorOff, MonitorUp, Settings } from 'lucide-react'
 import { Avatar, StatusDot } from '@/components/Avatar'
 import { IconButton } from '@/components/ui'
 import { useProfile } from '@/data/queries'
 import { useUi, type PresenceStatus } from '@/stores/ui'
 import { setDeafened, setMuted } from '@/voice/engine'
 import { useVoice } from '@/voice/store'
+import { stopScreen } from '@/voice/video'
 
 const STATUS_OPTIONS: { value: PresenceStatus; label: string; hint: string; dot: 'online' | 'idle' | 'dnd' | 'offline' }[] = [
   { value: 'online', label: 'Çevrimiçi', hint: 'Herkes seni çevrimiçi görür', dot: 'online' },
@@ -22,6 +23,9 @@ export function UserPanel({ userId }: { userId: string }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const muted = useVoice((s) => s.muted)
   const deafened = useVoice((s) => s.deafened)
+  // Yayın düğmesi yalnızca bir ses kanalına ya da aramaya bağlıyken görünür.
+  const connected = useVoice((s) => s.status === 'connected')
+  const sharing = useVoice((s) => !!s.localScreen)
 
   if (!profile) return null
   // Tıklama anındaki gerçek durum okunur; art arda hızlı tıklamalarda ekrandaki eski değere güvenilmez.
@@ -61,6 +65,15 @@ export function UserPanel({ userId }: { userId: string }) {
         >
           {deafened ? <HeadphoneOff className="size-[18px]" /> : <Headphones className="size-[18px]" />}
         </IconButton>
+        {connected && (
+          <IconButton
+            label={sharing ? 'Ekran paylaşımını durdur' : 'Ekranını paylaş'}
+            className={sharing ? 'text-success hover:text-success' : ''}
+            onClick={() => (sharing ? stopScreen() : openModal({ kind: 'share-screen' }))}
+          >
+            {sharing ? <MonitorOff className="size-[18px]" /> : <MonitorUp className="size-[18px]" />}
+          </IconButton>
+        )}
       <IconButton label="Ayarlar" onClick={() => openModal({ kind: 'settings' })}>
         <Settings className="size-[18px]" />
       </IconButton>

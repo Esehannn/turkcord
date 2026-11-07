@@ -13,7 +13,8 @@ import { useVoice, type VoiceParticipant } from './store'
 // sağırlaştırma gibi sık değişen durumlar anında, sınırı olmayan yayın (broadcast) ile gider (bkz. engine.ts);
 // buradaki `applyVoiceState` o yayını listeye işler. Presence'taki kopya, kanala sonradan bakanlar içindir.
 
-export type VoiceFlags = { muted: boolean; deafened: boolean; screen?: boolean; camera?: boolean; at: number }
+// viewers: ekran paylaşımını kaç kişinin izlediği (yayıncı bildirir).
+export type VoiceFlags = { muted: boolean; deafened: boolean; screen?: boolean; camera?: boolean; viewers?: number; at: number }
 // since: kanala giriş anı; "seste geçen süre" bundan hesaplanır.
 // v: ses düzeninin sürümü. Farklı düzendekiler birbirini duyamaz; listede "ESKİ" görünür.
 type Meta = Partial<VoiceFlags> & { since?: number; v?: number }
@@ -22,7 +23,10 @@ type Meta = Partial<VoiceFlags> & { since?: number; v?: number }
 const SIGNAL_VERSION = 3
 
 const TRACK_EVERY_MS = 12_000
-const MAX_REVIVES = 5
+// Kanal kapanınca yeniden kurmadan önce beklenen süre: 1, 2, 4… sn, en fazla bu kadar. Vazgeçilmez: bağlantı
+// ne kadar uzun koparsa kopsun, internet gelince liste kendiliğinden geri gelir (yoksa kanalda olduğunu sanıp
+// başkalarına görünmeden kalırdın).
+const REVIVE_MAX_MS = 30_000
 
 type Entry = {
   channel: RealtimeChannel
@@ -33,7 +37,7 @@ type Entry = {
   meta: (VoiceFlags & { since: number }) | null
   // Presence güncellemelerini seyrelten zamanlayıcı.
   pacer: ReturnType<typeof coalesce>
-  // Art arda kaç kez yeniden bağlanmak gerekti (sonsuz döngüye girmemek için).
+  // Art arda kaç kez yeniden bağlanmak gerekti (bekleme süresi buna göre uzar).
   revived: number
   // Presence'tan gelen son liste ve yayınla gelen daha taze durumlar.
   present: Map<string, Meta>
@@ -52,6 +56,7 @@ function publish(channelId: string, entry: Entry): void {
       deafened: !!best.deafened,
       screen: best.screen === true,
       camera: best.camera === true,
+      viewers: best.screen === true && typeof best.viewers === 'number' ? best.viewers : undefined,
       since: typeof meta.since === 'number' ? meta.since : undefined,
       legacy: meta.v !== SIGNAL_VERSION ? true : undefined,
     }
@@ -75,9 +80,12 @@ function revive(channelId: string, userId: string, dead: Entry): void {
   entries.delete(channelId)
   dead.pacer.cancel()
   void supabase.removeChannel(dead.channel)
-  if (dead.refs <= 0 || dead.revived >= MAX_REVIVES) return
+  if (dead.refs <= 0) return
+  revivals.set(channelId, dead)
   setTimeout(
     () => {
+      if (revivals.get(channelId) !== dead) return
+      revivals.delete(channelId)
       if (entries.has(channelId) || dead.refs <= 0) return
       const fresh = ensure(channelId, userId, dead.dm)
       fresh.refs = dead.refs
@@ -86,9 +94,11 @@ function revive(channelId: string, userId: string, dead: Entry): void {
       fresh.fresh = dead.fresh
       if (fresh.meta) void fresh.ready.then(() => fresh.pacer.trigger())
     },
-    1000 * (dead.revived + 1),
+    Math.min(REVIVE_MAX_MS, 1000 * 2 ** dead.revived),
   )
 }
+// Yeniden kurulmayı bekleyen kanallar (izlemeyi bırakan olursa sayaç buradan düşer).
+const revivals = new Map<string, Entry>()
 
 function ensure(channelId: string, userId: string, dm: boolean): Entry {
   const existing = entries.get(channelId)
@@ -139,10 +149,11 @@ export function watchVoiceRoom(channelId: string, userId: string, dm = false): (
   const entry = ensure(channelId, userId, dm)
   entry.refs++
   return () => {
-    // Kanal bu arada yeniden kurulmuş olabilir; güncel kayıt üzerinden say.
-    const current = entries.get(channelId) ?? entry
+    // Kanal bu arada yeniden kurulmuş ya da kurulmayı bekliyor olabilir; güncel kayıt üzerinden say.
+    const current = entries.get(channelId) ?? revivals.get(channelId) ?? entry
     current.refs--
     if (current.refs > 0) return
+    revivals.delete(channelId)
     current.pacer.cancel()
     if (entries.get(channelId) === current) {
       entries.delete(channelId)
@@ -170,9 +181,26 @@ export async function trackVoice(channelId: string, userId: string, flags: Omit<
   else current.pacer.trigger()
 }
 
+// Kanaldayım ama sunucunun listesinde görünmüyorum (ör. bağlantı koptu ve geri geldi): kendimi yeniden bildiririm.
+// Kanal kopuksa ya da hiç kurulamıyorsa baştan kurulur. Presence hız sınırı yüzünden en fazla TRACK_EVERY_MS'de bir.
+export function relistVoice(channelId: string, userId: string, rebuild: boolean): void {
+  const entry = entries.get(channelId)
+  if (!entry?.meta) return
+  if (rebuild) {
+    entry.revived = 0
+    revive(channelId, userId, entry)
+  } else {
+    entry.pacer.trigger()
+  }
+}
+
 export async function untrackVoice(channelId: string): Promise<void> {
   const entry = entries.get(channelId)
-  if (!entry) return
+  if (!entry) {
+    const waiting = revivals.get(channelId)
+    if (waiting) waiting.meta = null
+    return
+  }
   entry.meta = null
   entry.pacer.cancel()
   await entry.channel.untrack()

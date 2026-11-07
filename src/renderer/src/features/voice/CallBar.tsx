@@ -9,6 +9,7 @@ import { useUi } from '@/stores/ui'
 import { useVoice } from '@/voice/store'
 import { startCamera, stopCamera, stopScreen, unwatch, videoKey, watch } from '@/voice/video'
 import { PingBadge } from './Ping'
+import { StreamVolume, useStreamVolume } from './StreamVolume'
 import { useCameraFeeds, VideoView } from './VideoView'
 
 // Görüşme süresi (saniye); arama başlamadıysa null.
@@ -131,12 +132,13 @@ function CallVideos({ peerId, peerName }: { peerId: string; peerName: string }) 
   const peerCamera = useVoice((s) => s.videos[videoKey(peerId, 'camera')])
   const localCamera = useVoice((s) => s.localCamera)
   const localScreen = useVoice((s) => s.localScreen)
+  const screenVolume = useStreamVolume(peerId)
   if (!peerScreen && !peerCamera && !localCamera && !localScreen) return null
   return (
     <div className="flex h-[42vh] min-h-48 shrink-0 gap-2 border-b border-line bg-input p-2">
       {peerScreen && (
-        <CallTile label={`${peerName} · ekran`} wide onClose={() => unwatch(peerId, 'screen')}>
-          <VideoView stream={peerScreen} audio />
+        <CallTile label={`${peerName} · ekran`} wide onClose={() => unwatch(peerId, 'screen')} volumeOf={peerId}>
+          <VideoView stream={peerScreen} audio volume={screenVolume} />
         </CallTile>
       )}
       {peerCamera && (
@@ -161,7 +163,20 @@ function CallVideos({ peerId, peerName }: { peerId: string; peerName: string }) 
 }
 
 // Çift tıklayınca tam ekran olur.
-function CallTile({ label, wide = false, onClose, children }: { label: string; wide?: boolean; onClose?: () => void; children: React.ReactNode }) {
+// volumeOf: yayın sesi ayarı gösterilecek kişi (ekran paylaşımı karosunda).
+function CallTile({
+  label,
+  wide = false,
+  onClose,
+  volumeOf,
+  children,
+}: {
+  label: string
+  wide?: boolean
+  onClose?: () => void
+  volumeOf?: string
+  children: React.ReactNode
+}) {
   const ref = useRef<HTMLDivElement>(null)
   return (
     <div
@@ -171,16 +186,21 @@ function CallTile({ label, wide = false, onClose, children }: { label: string; w
     >
       {children}
       <span className="pointer-events-none absolute bottom-0 left-0 rounded-tr-md bg-black/60 px-2 py-0.5 text-xs font-semibold text-white">{label}</span>
-      {onClose && (
-        <button
-          type="button"
-          aria-label="İzlemeyi bırak"
-          data-tip="İzlemeyi bırak"
-          onClick={onClose}
-          className="absolute top-2 right-2 hidden size-7 place-items-center rounded-md bg-black/55 text-white group-hover:grid hover:bg-black/75"
-        >
-          <X className="size-3.5" />
-        </button>
+      {(onClose || volumeOf) && (
+        <div className="absolute top-2 right-2 hidden gap-1 group-hover:flex">
+          {volumeOf && <StreamVolume userId={volumeOf} />}
+          {onClose && (
+            <button
+              type="button"
+              aria-label="İzlemeyi bırak"
+              data-tip="İzlemeyi bırak"
+              onClick={onClose}
+              className="grid size-8 place-items-center rounded-md bg-black/55 text-white hover:bg-black/75"
+            >
+              <X className="size-3.5" />
+            </button>
+          )}
+        </div>
       )}
     </div>
   )

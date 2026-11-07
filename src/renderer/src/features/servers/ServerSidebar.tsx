@@ -12,6 +12,7 @@ import { publicImageUrl } from '@/lib/supabase'
 import { useSession } from '@/stores/session'
 import { joinVoice } from '@/voice/engine'
 import { useVoice } from '@/voice/store'
+import { watchWhenReady } from '@/voice/video'
 import { Elapsed, roomSince } from '@/features/voice/Elapsed'
 import { VoiceRoom } from '@/features/voice/VoiceRoom'
 import { useUi } from '@/stores/ui'
@@ -189,7 +190,16 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
                 onClick={() => openVoice(c.id)}
                 onSettings={() => openModal({ kind: 'channel-settings', channelId: c.id })}
               />
-              {me && <VoiceRoom channelId={c.id} me={me} />}
+              {me && (
+                <VoiceRoom
+                  channelId={c.id}
+                  me={me}
+                  onWatch={(userId) => {
+                    openVoice(c.id)
+                    watchWhenReady(c.id, userId)
+                  }}
+                />
+              )}
             </div>
           ))}
         </ChannelGroup>
