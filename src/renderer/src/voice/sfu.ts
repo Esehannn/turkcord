@@ -1,6 +1,6 @@
 import { functionErrorCode } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
-import { tuneOpus } from './sdp'
+import { fixOffer, tuneOpus } from './sdp'
 
 // Cloudflare Realtime SFU (ses odası sunucusu) ile tek bir oturum: tek RTCPeerConnection, üzerinden hem yayınlanan
 // hem çekilen izler geçer. Cloudflare'le doğrudan değil, "oda" Edge Function'ı üzerinden konuşulur; uygulama
@@ -39,6 +39,9 @@ export class SfuSession {
   id: string | null = null
   private queue: Promise<unknown> = Promise.resolve()
   private closed = false
+  // Bir pazarlık yarım kaldı (Cloudflare cevap bekliyor); oturum baştan kurulmalı.
+  broken = false
+  private pullFailures = 0
   // Çekilen izler: mid → kim, hangi iz.
   private readonly remotes = new Map<string, Remote>()
   // Yayınlanan izler: ad → mid.
@@ -87,6 +90,7 @@ export class SfuSession {
   private run<T>(task: () => Promise<T>): Promise<T> {
     const next = this.queue.then(() => {
       if (this.closed) throw new SfuError('closed')
+      if (this.broken) throw new SfuError('broken')
       return task()
     })
     this.queue = next.catch(() => undefined)
@@ -160,14 +164,30 @@ export class SfuSession {
     return this.run(async () => {
       if (!asks.length) return []
       await this.settled()
-      const result = await call<{ tracks: PullResult[]; sdp?: string }>({ action: 'pull', session: this.id, tracks: asks })
+      let result: { tracks: PullResult[]; sdp?: string }
+      try {
+        result = await call<{ tracks: PullResult[]; sdp?: string }>({ action: 'pull', session: this.id, tracks: asks })
+        this.pullFailures = 0
+      } catch (error) {
+        // Cloudflare çekmeyi art arda reddediyor (ör. oturum bir cevap bekliyor): oturum baştan kurulmalı.
+        if (error instanceof SfuError && error.code === 'sfu_error' && ++this.pullFailures >= 2) this.broken = true
+        throw error
+      }
       const tracks = result.tracks ?? []
       // ontrack, uzak teklif işlenirken gelir; kimin olduğu ondan önce bilinmeli.
       for (const t of tracks) if (t.mid) this.remotes.set(t.mid, { user: t.user, name: t.name })
       if (result.sdp) {
-        await this.pc.setRemoteDescription({ type: 'offer', sdp: result.sdp })
-        await this.pc.setLocalDescription(await this.pc.createAnswer())
-        await call({ action: 'renegotiate', session: this.id, sdp: this.pc.localDescription?.sdp })
+        try {
+          // Kapattığımız izlerin bölümleri teklifte reddedilmiş sayılır (bkz. fixOffer).
+          await this.pc.setRemoteDescription({ type: 'offer', sdp: fixOffer(result.sdp) })
+          await this.pc.setLocalDescription(await this.pc.createAnswer())
+          await call({ action: 'renegotiate', session: this.id, sdp: this.pc.localDescription?.sdp })
+        } catch (error) {
+          // Cloudflare cevap bekler hâlde kaldı: bu oturumdan artık bir şey çekilemez, baştan kurulmalı.
+          this.broken = true
+          console.warn('Cloudflare pazarlığı başarısız', this.kind, error)
+          throw new SfuError('broken')
+        }
       }
       return tracks
     })

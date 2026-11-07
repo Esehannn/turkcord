@@ -62,3 +62,12 @@ test('bağlantı ayarı Cloudflare aktarmasını yedek olarak ekler', () => {
   const servers = relayServers([{ urls: 'turn:turn.cloudflare.com:3478?transport=udp', username: 'k', credential: 's' }])
   assert.deepEqual(rtcConfig(servers), { iceServers: servers, iceTransportPolicy: 'all' })
 })
+
+
+test('Cloudflare teklifinde BUNDLE grubu yoksa açık bölümlerle eklenir', async () => {
+  const { fixOffer } = await import('../src/renderer/src/voice/sdp.ts')
+  const offer = ['v=0', 's=-', 'm=video 0 X 96', 'a=mid:0', 'm=video 9 X 96', 'a=mid:1', 'm=audio 9 X 111', 'a=mid:2', ''].join('\r\n')
+  assert.equal(fixOffer(offer).split('\r\n')[2], 'a=group:BUNDLE 1 2')
+  const grouped = ['v=0', 'a=group:BUNDLE 0', 'm=audio 9 X 111', 'a=mid:0', ''].join('\r\n')
+  assert.equal(fixOffer(grouped), grouped)
+})

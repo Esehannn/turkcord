@@ -4,7 +4,17 @@ import type { EffectId } from '@/lib/sounds'
 // since: kanala girdiği an (ms, kendi saatine göre); eski sürümler bildirmez.
 // screen / camera: ekranını paylaşıyor / kamerası açık (0.7.0 öncesi sürümler bildirmez).
 // legacy: başka bir ses düzeninde (0.8.0 ve öncesi); onunla birbirinizi duyamazsınız.
-export type VoiceParticipant = { userId: string; muted: boolean; deafened: boolean; since?: number; screen?: boolean; camera?: boolean; legacy?: boolean }
+// viewers: ekranını kaç kişi izliyor (yalnızca paylaşırken).
+export type VoiceParticipant = {
+  userId: string
+  muted: boolean
+  deafened: boolean
+  since?: number
+  screen?: boolean
+  camera?: boolean
+  viewers?: number
+  legacy?: boolean
+}
 export type VoiceStatus = 'idle' | 'connecting' | 'connected'
 // kapali: işlem yok, standart: tarayıcının gürültü engellemesi, guclu: yapay zekâ (RNNoise).
 export type NoiseMode = 'kapali' | 'standart' | 'guclu'
@@ -29,6 +39,8 @@ type VoicePrefs = {
   pttKey: string
   // Kişi başı ses seviyesi (0-1). Kayıt yoksa 1.
   volumes: Record<string, number>
+  // Kişi başı yayın (ekran paylaşımındaki bilgisayar sesi) seviyesi (0-1). Kayıt yoksa 1.
+  streamVolumes: Record<string, number>
 }
 
 type VoiceState = VoicePrefs & {
@@ -47,6 +59,10 @@ type VoiceState = VoicePrefs & {
   peers: Record<string, PeerState>
   link: PeerLink | null
   reconnecting: boolean
+  // Kanaldayım ama kanalın listesinde görünmüyorum (başkaları beni göremez); yeniden bildiriliyor.
+  unlisted: boolean
+  // Yayınımın internetime sığmadığı (yükleme hızı seçilen kaliteye yetmiyor).
+  uplinkLimited: boolean
   // Kanalda en son çalınan ses efekti (kimin bastığını göstermek için).
   lastEffect: { userId: string; id: EffectId; at: number } | null
   // Benim paylaştıklarım (yoksa null).
@@ -69,6 +85,7 @@ const PREF_KEYS = [
   'inputMode',
   'pttKey',
   'volumes',
+  'streamVolumes',
 ] as const satisfies readonly (keyof VoicePrefs)[]
 
 const defaults: VoicePrefs = {
@@ -82,6 +99,7 @@ const defaults: VoicePrefs = {
   inputMode: 'ses',
   pttKey: 'Backquote',
   volumes: {},
+  streamVolumes: {},
 }
 
 function readPrefs(): VoicePrefs {
@@ -112,6 +130,8 @@ export const useVoice = create<VoiceState>((set, get) => ({
   peers: {},
   link: null,
   reconnecting: false,
+  unlisted: false,
+  uplinkLimited: false,
   lastEffect: null,
   localScreen: null,
   localCamera: null,
@@ -130,6 +150,11 @@ export const useVoice = create<VoiceState>((set, get) => ({
 
 export function volumeOf(userId: string): number {
   return useVoice.getState().volumes[userId] ?? 1
+}
+
+export function setStreamVolume(userId: string, volume: number): void {
+  const streamVolumes = { ...useVoice.getState().streamVolumes, [userId]: Math.min(1, Math.max(0, volume)) }
+  useVoice.getState().setPrefs({ streamVolumes })
 }
 
 // Mikrofon şu an ses iletiyor mu? (susturma, sağırlaştırma ve bas-konuş birlikte)

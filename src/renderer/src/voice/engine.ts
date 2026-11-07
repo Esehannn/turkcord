@@ -5,9 +5,9 @@ import { supabase } from '@/lib/supabase'
 import { toast } from '@/stores/toast'
 import { rtcConfig, relayServers, type IceServer } from './ice'
 import { micErrorMessage, openMicrophone, type Microphone } from './mic'
-import { applyVoiceState, trackVoice, untrackVoice, watchVoiceRoom } from './presence'
+import { applyVoiceState, relistVoice, trackVoice, untrackVoice, watchVoiceRoom } from './presence'
 import { SfuError, SfuSession, type TrackName } from './sfu'
-import { onVideoSignal, retryVideo, startVideo, stopVideo, syncVideoRoom } from './video'
+import { onVideoSignal, retryVideo, startVideo, stopVideo, syncVideoRoom, viewerCount, watchWhenReady } from './video'
 import { voiceSounds } from './sounds'
 import { micOpen, useVoice, volumeOf, type PeerState } from './store'
 
@@ -27,7 +27,9 @@ import { micOpen, useVoice, volumeOf, type PeerState } from './store'
 //
 // Kopmalar: bekçi (her 2 sn) her kişiden ses paketi gelip gelmediğine bakar. Susturulmuş birinden de saniyede
 // onlarca paket gelir; 8 sn hiç gelmezse o kişinin sesi yeniden çekilir. Cloudflare bağlantısı koparsa oturum
-// baştan kurulur ("Yeniden bağlanıyor…").
+// baştan kurulur ("Yeniden bağlanıyor…"). Bekçi ayrıca kendimi kanalın listesinde görüyor muyum diye bakar:
+// Supabase bağlantısı kopup gelince listeden düşmüş olabilirim; o zaman kendimi yeniden bildiririm (görünmezsem
+// başkaları beni kanaldan çıkmış sanar, sesimi çekmez).
 //
 // Bireysel aramalar da aynı motoru kullanır: kanal özel mesajın kanalıdır, sunucu yoktur (serverId null).
 // Görüntü (ekran paylaşımı, kamera) ayrı bir oturumdan gider ve yalnızca izlenince açılır; bkz. video.ts.
@@ -49,6 +51,9 @@ const SELF_RESTART_MS = 15_000
 const SELF_RESTART_MIN_AGE_MS = 5000
 // Bir kişiye en fazla bu sıklıkla "duyamıyorum" denir.
 const COMPLAIN_MS = 15_000
+// Kanalın listesinde bu kadar süre kendimi göremezsem yeniden bildiririm; daha uzun sürerse liste kanalını baştan kurarım.
+const UNLISTED_MS = 6000
+const UNLISTED_REBUILD_MS = 30_000
 
 // merhaba: konunun dinlendiğini karşıya bildirir; karşı taraf susturma durumunu hemen yollar.
 // duyamiyorum: karşının sesi birkaç denemede çekilemedi; Cloudflare'deki yayını bozulmuş olabilir, o kendi oturumunu
@@ -103,6 +108,8 @@ let restartTries = 0
 let sessionOpenedAt = 0
 let selfRestartAt = 0
 const complained = new Map<string, number>()
+let unlistedSince = 0
+let rebuiltAt = 0
 let audioCtx: AudioContext | null = null
 let joinToken = 0
 
@@ -298,14 +305,37 @@ async function syncAudio(): Promise<void> {
     }
   } catch (error) {
     for (const userId of asks) schedulePullRetry(userId)
-    if (error instanceof SfuError && (error.code === 'session_gone' || error.code === 'not_found')) restartSession()
+    if (current.broken || (error instanceof SfuError && (error.code === 'session_gone' || error.code === 'not_found'))) restartSession()
   } finally {
     for (const userId of asks) pulling.delete(userId)
   }
 }
 
 // Bekçi: gecikmeyi okur, sesi gelmeyenleri yeniden çeker, kopmuş bağlantıyı baştan kurar.
+// Kanaldayım ama sunucunun listesinde görünmüyorsam (ya da Supabase bağlantım kopuksa) kendimi yeniden bildiririm;
+// bu sırada bağlantı kutusunda "Yeniden bağlanıyor…" yazar.
+function checkListed(): void {
+  const { channelId, rooms, status } = useVoice.getState()
+  if (!channelId || status !== 'connected' || !signalReady) return
+  // Supabase bağlantım kopuksa listem eskimiştir: kendimi orada görsem de başkaları beni göremez.
+  const listed = supabase.realtime.isConnected() && !!rooms[channelId]?.some((p) => p.userId === me)
+  const now = Date.now()
+  if (listed) {
+    unlistedSince = 0
+    if (useVoice.getState().unlisted) setState({ unlisted: false })
+    return
+  }
+  unlistedSince ||= now
+  const missing = now - unlistedSince
+  if (missing < UNLISTED_MS) return
+  if (!useVoice.getState().unlisted) setState({ unlisted: true })
+  const rebuild = missing > UNLISTED_REBUILD_MS && now - rebuiltAt > UNLISTED_REBUILD_MS
+  if (rebuild) rebuiltAt = now
+  relistVoice(channelId, me, rebuild)
+}
+
 async function watchdog(): Promise<void> {
+  checkListed()
   const current = session
   if (!current || current.isClosed || !current.id) return
   if (lostSince && Date.now() - lostSince > LOST_MS) {
@@ -476,10 +506,13 @@ function syncListeners(): void {
 
 // Kanaldan çıkanların sesini bırak, girenler için ses efekti çal.
 let lastRoom = new Set<string>()
+// Kanalda ekranını paylaşanlar (yeni başlayan yayını haber vermek için).
+let lastScreens = new Set<string>()
 function onRoomChange(): void {
   const { channelId, rooms, status } = useVoice.getState()
   if (!channelId || status === 'idle') return
   const now = new Set((rooms[channelId] ?? []).map((p) => p.userId))
+  const screens = new Set((rooms[channelId] ?? []).filter((p) => p.screen && !p.legacy).map((p) => p.userId))
   syncListeners()
   syncVideoRoom()
   void syncAudio()
@@ -488,8 +521,30 @@ function onRoomChange(): void {
     for (const userId of lastRoom) if (!now.has(userId) && userId !== me) voiceSounds.leave()
     // Yeni gelen biri hemen çekilebilsin diye eski bekleme süresi silinir.
     for (const userId of now) if (!lastRoom.has(userId)) pullRetries.delete(userId)
+    // Kanalda zaten olan biri yayın açtı (ben girerken sürmekte olan yayınlar haber verilmez).
+    for (const userId of screens) {
+      if (!lastScreens.has(userId) && lastRoom.has(userId) && userId !== me) void announceStream(channelId, userId)
+    }
   }
   lastRoom = now
+  lastScreens = screens
+}
+
+// Kanaldaki biri yayın açınca kısa bir ses ve "İzle" düğmeli bir bildirim.
+async function announceStream(channelId: string, userId: string): Promise<void> {
+  if (!useVoice.getState().deafened) voiceSounds.stream()
+  const { data } = await supabase.from('profiles').select('display_name').eq('id', userId).maybeSingle()
+  const { channelId: current, serverId, videos } = useVoice.getState()
+  if (current !== channelId || !isInRoom(userId) || `${userId}:screen` in videos) return
+  toast.action(`${data?.display_name ?? 'Biri'} yayın açtı.`, 'İzle', () => {
+    if (serverId) openVoiceRoom(serverId, channelId)
+    watchWhenReady(channelId, userId)
+  })
+}
+
+// Ses odasını ortada açar (arayüz bu olayı dinler; motor arayüze bağımlı olmasın diye).
+function openVoiceRoom(serverId: string, channelId: string): void {
+  window.dispatchEvent(new CustomEvent('turkcord:ses-odasi', { detail: { serverId, channelId } }))
 }
 useVoice.subscribe((state, prev) => {
   if (state.rooms !== prev.rooms) onRoomChange()
@@ -523,22 +578,29 @@ const stateBroadcaster = coalesce(() => {
   void signal.send({
     type: 'broadcast',
     event: 'durum',
-    payload: { muted, deafened, screen: !!localScreen, camera: !!localCamera, at: Date.now() },
+    payload: { muted, deafened, screen: !!localScreen, camera: !!localCamera, viewers: viewerCount(), at: Date.now() },
   })
 }, 150)
 
 function publishState(): void {
   const { channelId, muted, deafened, localScreen, localCamera } = useVoice.getState()
   if (!channelId) return
-  void trackVoice(channelId, me, { muted, deafened, screen: !!localScreen, camera: !!localCamera }, dmRoom)
+  void trackVoice(channelId, me, { muted, deafened, screen: !!localScreen, camera: !!localCamera, viewers: viewerCount() }, dmRoom)
   stateBroadcaster.trigger()
 }
 
 function onPeerState(from: string, payload: unknown): void {
-  const { muted, deafened, screen, camera, at } = (payload ?? {}) as Record<string, unknown>
+  const { muted, deafened, screen, camera, viewers, at } = (payload ?? {}) as Record<string, unknown>
   const { channelId } = useVoice.getState()
   if (!channelId || typeof at !== 'number') return
-  applyVoiceState(channelId, from, { muted: muted === true, deafened: deafened === true, screen: screen === true, camera: camera === true, at })
+  applyVoiceState(channelId, from, {
+    muted: muted === true,
+    deafened: deafened === true,
+    screen: screen === true,
+    camera: camera === true,
+    viewers: typeof viewers === 'number' && viewers >= 0 ? Math.min(99, Math.floor(viewers)) : undefined,
+    at,
+  })
 }
 
 // Aç/kapa sesleri üst üste binmesin: hızlı tıklamalarda sadece aralıklı olanlar çalar.
@@ -628,8 +690,10 @@ export async function joinVoice(serverId: string | null, channelId: string, user
   const token = ++joinToken
   me = userId
   dmRoom = serverId === null
-  setState({ status: 'connecting', channelId, serverId, speaking: {}, peers: {}, link: null, reconnecting: false, lastEffect: null })
+  setState({ status: 'connecting', channelId, serverId, speaking: {}, peers: {}, link: null, reconnecting: false, unlisted: false, lastEffect: null })
   lastRoom = new Set()
+  lastScreens = new Set()
+  unlistedSince = 0
 
   if ((await loadRelay()) === 'guncelle') {
     if (token === joinToken) {
@@ -726,6 +790,7 @@ export async function leaveVoice(playSound = true): Promise<void> {
   restartTries = 0
   lostSince = 0
   for (const userId of [...remotes.keys()]) releaseRemote(userId)
+  unlistedSince = 0
   pulling.clear()
   pullRetries.clear()
   complained.clear()
@@ -748,8 +813,9 @@ export async function leaveVoice(playSound = true): Promise<void> {
   mic?.stop()
   mic = null
   lastRoom = new Set()
+  lastScreens = new Set()
   lastHeardEffect.clear()
-  setState({ status: 'idle', channelId: null, serverId: null, speaking: {}, peers: {}, link: null, reconnecting: false, lastEffect: null })
+  setState({ status: 'idle', channelId: null, serverId: null, speaking: {}, peers: {}, link: null, reconnecting: false, unlisted: false, lastEffect: null })
   if (channelId && playSound) voiceSounds.leave()
 }
 

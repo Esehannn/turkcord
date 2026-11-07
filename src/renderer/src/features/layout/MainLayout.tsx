@@ -13,7 +13,7 @@ import { MemberList } from '@/features/servers/MemberList'
 import { ServerSidebar } from '@/features/servers/ServerSidebar'
 import { autoCleanupOldFiles } from '@/features/settings/AdminPanel'
 import { ModalHost } from './ModalHost'
-import { ServerRail } from './ServerRail'
+import { rememberedChannel, ServerRail } from './ServerRail'
 import { UserPanel } from './UserPanel'
 import { IncomingCall } from '@/features/voice/IncomingCall'
 import { MiniPlayer } from '@/features/voice/MiniPlayer'
@@ -44,6 +44,15 @@ export function MainLayout({ userId }: { userId: string }) {
   profileMap.current = profiles.data
   useEffect(() => initCalls(userId, (id) => profileMap.current?.get(id)?.display_name ?? 'Biri'), [userId])
   useEffect(() => startDesktopBridge(), [])
+  // Motor ses odasını açtırmak isteyince (ör. "yayın açtı" bildirimindeki "İzle").
+  useEffect(() => {
+    const open = (event: Event) => {
+      const { serverId, channelId } = (event as CustomEvent<{ serverId: string; channelId: string }>).detail
+      setView({ kind: 'server', serverId, channelId: rememberedChannel(serverId), voiceId: channelId })
+    }
+    window.addEventListener('turkcord:ses-odasi', open)
+    return () => window.removeEventListener('turkcord:ses-odasi', open)
+  }, [setView])
 
   // Yöneticinin uygulaması açıkken eski ve büyük dosya ekleri günde bir kez temizlenir (1 GB'lık alan dolmasın).
   const isAdmin = !!profiles.data?.get(userId)?.is_admin

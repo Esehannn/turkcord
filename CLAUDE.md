@@ -38,9 +38,17 @@ Arayüz metinleri, kod yorumları ve commit mesajları Türkçe.
 - Kopmalar: `engine.ts`'teki bekçi her kişiden ses paketi geliyor mu bakar (susturulmuşken de paket gelir); gelmezse
   yeniden çeker, Cloudflare bağlantısı koparsa oturumu baştan kurar. Cloudflare yeni bir yayını, yayıncının ilk
   paketleri gelmeden yapılan pazarlıkta tanımayabiliyor; `sfu.ts` bu yüzden yayın varken önce bağlantıyı bekler.
+  Bekçi kendimi kanalın listesinde (presence) ve Supabase bağlantısını da denetler; listeden düşünce yeniden bildirir.
+  Presence kanalını yeniden kurmaktan vazgeçme (`presence.ts` `revive`): vazgeçilirse kişi kendini kanalda sanır
+  ama başkalarına görünmez, sesi çekilmez.
+- Bir SFU oturumunda bir iz kapatıldıktan (`closeMids`) sonra Cloudflare'in teklifini tarayıcı reddedebiliyor
+  (max-bundle, grubun başındaki iz kapalı); reddedilince oturum cevap bekler hâlde kilitlenir. Pazarlık yarım kalırsa
+  oturum `broken` olur ve baştan kurulur; görüntü oturumu da başka iz kalmayınca izleri kapatmak yerine kapanır.
 - Görüntü (ekran paylaşımı, kamera) ses oturumundan geçmez: `voice/video.ts` ayrı bir SFU oturumu açar, yalnızca biri
   izlerken ya da yayınlarken. Ses oturumunu görüntü için yeniden pazarlık ettirme. Yayıncı ancak biri "izle" deyince
-  gönderir. Görüntü yalnızca onu gösteren ekran açıkken izlenir (`useCameraFeeds`, "İzle" düğmesi).
+  gönderir. Görüntü yalnızca onu gösteren ekran açıkken izlenir (`useCameraFeeds`, "İzle" düğmesi). İzlenmek istenen
+  görüntü gelene kadar yeniden istenir, donan görüntü yeniden çekilir; listeden kısa süre düşen yayıncı ya da izleyici
+  hemen bırakılmaz (`video.ts` bekçisi).
 - Ekran yakalama kaynağını ana süreç verir (`main/capture.ts`): arayüz önce `pickScreen` ile seçimi bildirir, sonra
   `getDisplayMedia` çağırır. Yerelde denerken `--use-fake-device-for-media-stream` ekran yakalamayı da sahtesiyle değiştirir.
 

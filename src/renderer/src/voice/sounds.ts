@@ -8,4 +8,5 @@ export const voiceSounds = {
   unmute: () => playVoiceCue('unmute'),
   pttOn: () => playVoiceCue('pttOn'),
   pttOff: () => playVoiceCue('pttOff'),
+  stream: () => playVoiceCue('stream'), // kanaldaki biri yayın açtı
 }

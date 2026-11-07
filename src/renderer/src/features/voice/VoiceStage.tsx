@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
+  Eye,
   Headphones,
   HeadphoneOff,
   LayoutGrid,
@@ -30,6 +31,7 @@ import { Elapsed, roomSince } from './Elapsed'
 import { PeerBadge } from './Ping'
 import { useCameraFeeds, VideoView } from './VideoView'
 import { ParticipantMenu } from './VoiceRoom'
+import { StreamVolume, useStreamVolume } from './StreamVolume'
 
 // Ses odası: ses kanalına tıklayınca ortada açılır. Kanaldakiler karolarla görünür; konuşanın çerçevesi yanar,
 // kamerası açık olanın görüntüsü karosunda oynar, ekran paylaşımları ayrı karolardır ("İzle"ye basınca gelir).
@@ -224,6 +226,8 @@ function StageTile({
   const waiting = peerState === 'connecting'
   const remote = useVoice((s) => s.videos[videoKey(p.userId, kind === 'screen' ? 'screen' : 'camera')])
   const local = useVoice((s) => (kind === 'screen' ? s.localScreen : s.localCamera))
+  const uplinkLimited = useVoice((s) => kind === 'screen' && mine && s.uplinkLimited)
+  const streamVolume = useStreamVolume(p.userId)
   const ref = useRef<HTMLDivElement>(null)
 
   const stream = mine ? local : (remote ?? null)
@@ -239,6 +243,14 @@ function StageTile({
       body = (
         <Panel icon={<Monitor className={compact ? 'size-5' : 'size-9'} />} title={compact ? '' : 'Ekranını paylaşıyorsun'}>
           {!compact && (
+            <p className="-mt-2 text-xs">{p.viewers ? `${p.viewers} kişi izliyor` : 'Henüz izleyen yok'}</p>
+          )}
+          {!compact && uplinkLimited && (
+            <p className="max-w-72 text-xs font-medium text-idle">
+              İnternetinin yükleme hızı bu kaliteye yetmiyor; yayın takılabilir. Daha düşük kaliteyle yeniden başlatmayı dene.
+            </p>
+          )}
+          {!compact && (
             <Button
               variant="secondary"
               className="h-8"
@@ -253,12 +265,13 @@ function StageTile({
         </Panel>
       )
     } else if (stream) {
-      body = <VideoView stream={stream} audio />
+      body = <VideoView stream={stream} audio volume={streamVolume} />
     } else if (requested) {
       body = <Panel icon={<Spinner />} title={compact ? '' : 'Yayına bağlanılıyor…'} />
     } else {
       body = (
         <Panel icon={<Monitor className={compact ? 'size-5' : 'size-9'} />} title={compact ? '' : `${name} ekranını paylaşıyor`}>
+          {!compact && !!p.viewers && <p className="-mt-2 text-xs">{p.viewers} kişi izliyor</p>}
           {!compact && (
             <Button
               className="h-8"
@@ -311,7 +324,12 @@ function StageTile({
       >
         {kind === 'screen' && <Monitor className="size-3.5 shrink-0" />}
         <span className={`truncate font-semibold ${compact ? 'text-xs' : 'text-sm'}`}>{kind === 'screen' && !compact ? `${name} · ekran` : name}</span>
-        {kind === 'person' && p.muted && <MicOff className="size-3.5 shrink-0 text-accent" aria-label="Mikrofonu kapalı" />}
+        {kind === 'screen' && !compact && !!p.viewers && (
+          <span className="pointer-events-auto ml-auto flex shrink-0 items-center gap-1 text-xs font-medium tabular-nums" data-tip={`${p.viewers} kişi izliyor`}>
+            <Eye className="size-3.5" /> {p.viewers}
+          </span>
+        )}
+        {kind === 'person' && (p.muted || p.deafened) && <MicOff className="size-3.5 shrink-0 text-accent" aria-label="Mikrofonu kapalı" />}
         {kind === 'person' && p.deafened && <HeadphoneOff className="size-3.5 shrink-0 text-accent" aria-label="Sağırlaştırılmış" />}
         {!compact && kind === 'person' && (
           <span className={`pointer-events-auto ml-auto flex shrink-0 items-center gap-2 text-xs ${onVideo ? 'text-white/80' : 'text-muted'}`}>
@@ -330,6 +348,7 @@ function StageTile({
       {/* Üstüne gelince çıkan düğmeler */}
       {!compact && (
         <div className="absolute top-2 right-2 hidden gap-1 group-hover:flex">
+          {kind === 'screen' && !mine && stream && <StreamVolume userId={p.userId} />}
           {stream && (
             <TileButton label="Tam ekran" onClick={fullscreen}>
               <Maximize className="size-4" />

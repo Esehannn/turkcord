@@ -3,16 +3,18 @@ import { useVoice } from '@/voice/store'
 import { unwatch, watch } from '@/voice/video'
 
 // Bir görüntü akışını gösterir. audio: akıştaki ses de çalınsın mı (ekran paylaşımındaki bilgisayar sesi);
-// sağırlaştırılmışken o da susar. mirror: kendi kameram ayna gibi gösterilir.
+// sağırlaştırılmışken o da susar. volume: o sesin seviyesi (0-1). mirror: kendi kameram ayna gibi gösterilir.
 export function VideoView({
   stream,
   audio = false,
+  volume = 1,
   mirror = false,
   fit = 'contain',
   className = '',
 }: {
   stream: MediaStream
   audio?: boolean
+  volume?: number
   mirror?: boolean
   fit?: 'contain' | 'cover'
   className?: string
@@ -30,6 +32,10 @@ export function VideoView({
       el.srcObject = null
     }
   }, [stream])
+
+  useEffect(() => {
+    if (ref.current) ref.current.volume = Math.min(1, Math.max(0, volume))
+  }, [volume, stream])
 
   // Ses, sesli sohbetle aynı hoparlörden çıkar.
   useEffect(() => {
