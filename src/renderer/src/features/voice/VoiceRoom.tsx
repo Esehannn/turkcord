@@ -49,7 +49,12 @@ export function VoiceRoom({ channelId, me, onWatch }: { channelId: string; me: s
                 {name}
               </span>
               {p.screen && p.userId === me && (
-                <Tv className="size-3.5 shrink-0 text-accent" data-tip={p.viewers ? `Ekranını paylaşıyorsun · ${p.viewers} kişi izliyor` : 'Ekranını paylaşıyorsun'} />
+                <span
+                  className="flex shrink-0 items-center gap-1 rounded bg-accent px-1.5 text-[10px] leading-[18px] font-bold tracking-wide text-on-accent"
+                  data-tip={p.viewers ? `Ekranını paylaşıyorsun · ${p.viewers} kişi izliyor` : 'Ekranını paylaşıyorsun'}
+                >
+                  <Tv className="size-3" /> CANLI
+                </span>
               )}
               {p.screen && p.userId !== me && (
                 <span

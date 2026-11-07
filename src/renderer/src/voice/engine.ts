@@ -305,18 +305,20 @@ async function syncAudio(): Promise<void> {
     }
   } catch (error) {
     for (const userId of asks) schedulePullRetry(userId)
-    if (error instanceof SfuError && (error.code === 'session_gone' || error.code === 'not_found')) restartSession()
+    if (current.broken || (error instanceof SfuError && (error.code === 'session_gone' || error.code === 'not_found'))) restartSession()
   } finally {
     for (const userId of asks) pulling.delete(userId)
   }
 }
 
 // Bekçi: gecikmeyi okur, sesi gelmeyenleri yeniden çeker, kopmuş bağlantıyı baştan kurar.
-// Kanaldayım ama sunucunun listesinde görünmüyorsam kendimi yeniden bildiririm.
+// Kanaldayım ama sunucunun listesinde görünmüyorsam (ya da Supabase bağlantım kopuksa) kendimi yeniden bildiririm;
+// bu sırada bağlantı kutusunda "Yeniden bağlanıyor…" yazar.
 function checkListed(): void {
   const { channelId, rooms, status } = useVoice.getState()
   if (!channelId || status !== 'connected' || !signalReady) return
-  const listed = !!rooms[channelId]?.some((p) => p.userId === me)
+  // Supabase bağlantım kopuksa listem eskimiştir: kendimi orada görsem de başkaları beni göremez.
+  const listed = supabase.realtime.isConnected() && !!rooms[channelId]?.some((p) => p.userId === me)
   const now = Date.now()
   if (listed) {
     unlistedSince = 0
