@@ -50,7 +50,7 @@ export function UserPanel({ userId }: { userId: string }) {
           <span className="block truncate text-xs text-muted">{profile.custom_status || current.label}</span>
         </span>
       </button>
-      <div className="flex">
+      <div className="flex [&>button]:size-7">
         <IconButton
           label={muted || deafened ? 'Mikrofonu aç' : 'Mikrofonu kapat'}
           className={muted || deafened ? 'text-accent hover:text-accent' : ''}

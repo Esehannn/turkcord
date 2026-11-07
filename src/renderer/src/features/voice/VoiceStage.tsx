@@ -271,6 +271,7 @@ function StageTile({
     } else {
       body = (
         <Panel icon={<Monitor className={compact ? 'size-5' : 'size-9'} />} title={compact ? '' : `${name} ekranını paylaşıyor`}>
+          {!compact && !!p.viewers && <p className="-mt-2 text-xs">{p.viewers} kişi izliyor</p>}
           {!compact && (
             <Button
               className="h-8"

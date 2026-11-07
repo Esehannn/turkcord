@@ -76,7 +76,7 @@ export function VoiceRoom({ channelId, me, onWatch }: { channelId: string; me: s
                         ? `Yayını izle${p.viewers ? ` · ${p.viewers} kişi izliyor` : ''}`
                         : 'Kanala gir ve yayını izle'
                   }
-                  className="flex shrink-0 items-center gap-1 rounded bg-accent px-1.5 text-[11px] leading-[18px] font-semibold text-on-accent hover:bg-accent-hover"
+                  className="flex shrink-0 cursor-pointer items-center gap-1 rounded bg-accent px-1.5 text-[11px] leading-[18px] font-semibold text-on-accent transition-colors outline-none hover:bg-accent-hover focus-visible:ring-2 focus-visible:ring-accent/50"
                 >
                   <Tv className="size-3" /> {`${p.userId}:screen` in videos && inThisRoom ? 'İzleniyor' : 'Katıl'}
                 </span>
