@@ -32,6 +32,27 @@ function serialize(current: Record<string, string>, extra: Record<string, string
     .join(';')
 }
 
+// Görüntünün başlangıç hızı (kbps). Tarayıcı yeni bir bağlantıya ~300 kbps ile başlayıp yavaşça yükselir; ekran
+// paylaşımı bu yüzden ilk ~20 sn 360p'de kalıyordu. Cloudflare'in cevabındaki görüntü kodeklerine yazılınca tarayıcı
+// tahminine buradan başlar (yetmezse yine düşürür). Ölçüm: 1080p60 yayında 720p'ye 2. saniyede çıkıyor.
+const VIDEO_CODEC = /^a=rtpmap:(\d+) (VP8|VP9|H264|H265|AV1)\/90000/gim
+
+export function startBitrate(sdp: string, kbps: number): string {
+  const eol = sdp.includes('\r\n') ? '\r\n' : '\n'
+  const value = `x-google-start-bitrate=${Math.round(kbps)}`
+  for (const [, payload] of sdp.matchAll(VIDEO_CODEC)) {
+    const fmtp = new RegExp(`^(a=fmtp:${payload} )([^\\r\\n]*)$`, 'm')
+    if (fmtp.test(sdp)) {
+      sdp = sdp.replace(fmtp, (_, head: string, params: string) =>
+        head + [...params.split(';').filter((p) => p && !p.trim().startsWith('x-google-start-bitrate=')), value].join(';'),
+      )
+    } else {
+      sdp = sdp.replace(new RegExp(`^(a=rtpmap:${payload} [^\\r\\n]*)$`, 'm'), `$1${eol}a=fmtp:${payload} ${value}`)
+    }
+  }
+  return sdp
+}
+
 // Cloudflare'in yeniden pazarlık teklifinde BUNDLE grubu yoksa açık (portu 0 olmayan) bölümlerle eklenir: bağlantımız
 // "max-bundle" ile kurulu ve tarayıcı grupsuz teklifi reddeder. (Grubun başındaki izi kapattığımız bir oturuma
 // gelen teklifi ise tarayıcı hiçbir şekilde kabul etmiyor; o durumda oturum baştan kurulur, bkz. video.ts.)

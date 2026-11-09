@@ -1,6 +1,6 @@
 import { functionErrorCode } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
-import { fixOffer, tuneOpus } from './sdp'
+import { fixOffer, startBitrate, tuneOpus } from './sdp'
 
 // Cloudflare Realtime SFU (ses odası sunucusu) ile tek bir oturum: tek RTCPeerConnection, üzerinden hem yayınlanan
 // hem çekilen izler geçer. Cloudflare'le doğrudan değil, "oda" Edge Function'ı üzerinden konuşulur; uygulama
@@ -28,8 +28,12 @@ export class SfuError extends Error {
   }
 }
 
+// Bir istek en fazla bu kadar sürer. Sunucuda bir istek iki buçuk dakika askıda kaldığında oturumun bütün
+// sırası (yayınla, çek) onu bekliyor, yayın hiç açılmıyordu; süre dolunca hata sayılır ve oturum baştan kurulur.
+const CALL_TIMEOUT_MS = 15_000
+
 async function call<T>(body: Record<string, unknown>): Promise<T> {
-  const { data, error } = await supabase.functions.invoke<T>('oda', { body })
+  const { data, error } = await supabase.functions.invoke<T>('oda', { body, timeout: CALL_TIMEOUT_MS })
   if (error) throw new SfuError((await functionErrorCode(error)) ?? 'failed')
   return data as T
 }
@@ -86,12 +90,24 @@ export class SfuSession {
     })
   }
 
-  // Sıradaki işlem öncekinin bitmesini bekler (biri hata verse bile sıra bozulmaz).
+  // Sıradaki işlem öncekinin bitmesini bekler (biri hata verse bile sıra bozulmaz). Oturum şu durumlarda bozuk sayılır
+  // ve baştan kurulmalıdır:
+  //  - Bir işlem pazarlığın ortasında hata verdi (teklif gitti, cevap gelmedi ya da istek zaman aşımına uğradı):
+  //    bağlantı yarım kaldı, bundan sonraki her pazarlık reddedilir.
+  //  - Cloudflare oturumu kapatmış (session_gone) ya da sunucudaki kaydı yok (not_found). Cloudflare, bağlantısı hiç
+  //    kurulmamış bir oturumu 5-15 sn içinde kapatıyor: "İzle"ye basılıp yayın gecikince izleyicinin oturumu
+  //    ölüyor, uygulama da ölü oturumdan sonsuza kadar çekmeye çalışıyordu.
   private run<T>(task: () => Promise<T>): Promise<T> {
-    const next = this.queue.then(() => {
+    const next = this.queue.then(async () => {
       if (this.closed) throw new SfuError('closed')
       if (this.broken) throw new SfuError('broken')
-      return task()
+      try {
+        return await task()
+      } catch (error) {
+        const gone = error instanceof SfuError && (error.code === 'session_gone' || error.code === 'not_found')
+        if (!this.closed && (gone || this.pc.signalingState !== 'stable')) this.broken = true
+        throw error
+      }
     })
     this.queue = next.catch(() => undefined)
     return next
@@ -132,7 +148,8 @@ export class SfuSession {
     })
   }
 
-  publish(tracks: LocalTrack[]): Promise<void> {
+  // startKbps: görüntü bu hızla başlar (bkz. sdp.ts startBitrate); verilmezse tarayıcının varsayılanı.
+  publish(tracks: LocalTrack[], startKbps?: number): Promise<void> {
     return this.run(async () => {
       await this.settled()
       const transceivers = this.addLocal(tracks)
@@ -144,7 +161,10 @@ export class SfuSession {
         tracks: tracks.map((t, i) => ({ mid: transceivers[i].mid, name: t.name })),
       })
       tracks.forEach((t, i) => this.locals.set(t.name, transceivers[i].mid ?? ''))
-      if (result.sdp) await this.pc.setRemoteDescription({ type: 'answer', sdp: tuneOpus(result.sdp) })
+      if (result.sdp) {
+        const sdp = tuneOpus(result.sdp)
+        await this.pc.setRemoteDescription({ type: 'answer', sdp: startKbps ? startBitrate(sdp, startKbps) : sdp })
+      }
     })
   }
 
@@ -155,8 +175,9 @@ export class SfuSession {
     return this.closeMids(mids)
   }
 
-  isPublished(name: TrackName): boolean {
-    return this.locals.has(name)
+  // Yayınlanan izin mid'i (yayınlanmadıysa undefined).
+  localMid(name: TrackName): string | undefined {
+    return this.locals.get(name)
   }
 
   // İzleri çeker. Sonuçta her iz için ya mid ya hata (not_found: o kişi henüz yayınlamamış) vardır.

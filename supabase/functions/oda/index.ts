@@ -20,6 +20,7 @@ const MAX_SDP = 64 * 1024
 // Oturum türüne göre yayınlanabilecek izler. Çekilecek izin hangi oturumda olduğu da buradan bulunur.
 const TRACKS: Record<string, 'ses' | 'goruntu'> = { ses: 'ses', ekran: 'goruntu', 'ekran-ses': 'goruntu', kamera: 'goruntu' }
 const MAX_TRACKS = 20
+const SFU_TIMEOUT_MS = 10_000
 
 type Kind = 'ses' | 'goruntu'
 type CfTrack = { location?: string; mid?: string; trackName?: string; sessionId?: string; errorCode?: string; errorDescription?: string }
@@ -45,10 +46,15 @@ function sfu(path: string, method: 'GET' | 'POST' | 'PUT', body?: unknown): Prom
   const appId = Deno.env.get('CLOUDFLARE_SFU_APP_ID')
   const token = Deno.env.get('CLOUDFLARE_SFU_APP_TOKEN')
   if (!appId || !token) throw new Fail(503, 'sfu_unavailable')
+  // Cloudflare cevap vermezse istek askıda kalmasın (bir keresinde 150 sn sürüp işçi sınırına takıldı).
   return fetch(`https://rtc.live.cloudflare.com/v1/apps/${appId}${path}`, {
     method,
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
+    signal: AbortSignal.timeout(SFU_TIMEOUT_MS),
+  }).catch((error) => {
+    console.error('cloudflare sfu', path.replace(/[0-9a-f]{32,}/g, '…'), error instanceof Error ? error.name : 'fetch')
+    throw new Fail(502, 'sfu_error')
   }).then(async (res) => {
     const data = (await res.json().catch(() => ({}))) as CfResponse
     // 410: oturum kapanmış (bağlantı koptu); uygulama baştan kurar.
