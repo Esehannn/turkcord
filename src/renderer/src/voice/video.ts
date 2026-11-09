@@ -23,8 +23,13 @@ import { useVoice } from './store'
 //  - Gelen görüntünün paketleri bir süre durursa (yayın donduysa) görüntü yeniden istenir.
 //  - Biri listeden kısa süre düşerse (Supabase bağlantısı kopup geldi) yayın hemen kapatılmaz: izleyici yayını,
 //    yayıncı da izleyicisini bir süre bekler. Kişi geri gelince kaldığı yerden sürer.
-//  - Görüntü bağlantısı bir süre kopuk kalırsa oturum baştan kurulur.
-//  - Yayıncının yükleme hızı seçilen kaliteye yetmiyorsa uyarılır.
+//  - Görüntü bağlantısı bir süre kopuk kalırsa oturum baştan kurulur. Cloudflare'e giden her isteğin süresi sınırlıdır
+//    (sfu.ts); yarım kalan pazarlık da oturumu baştan kurdurur.
+//  - Yayıncı oturumunu baştan kurunca "yayinda" yeni bir yayın kimliğiyle gider; izleyenler eski görüntünün donmasını
+//    beklemeden yenisini çeker.
+//  - Yayıncı oturumunu yalnızca Cloudflare izleyiciye yayını tekrar tekrar "yok" derse baştan kurar; bir izleyicinin
+//    kendi bağlantı sorunu yayını herkes için koparmaz.
+//  - Yayıncının yükleme hızı seçilen kaliteye gerçekten yetmiyorsa uyarılır (bkz. checkUplink).
 
 export type VideoKind = 'screen' | 'camera'
 export type ScreenQuality = '720p30' | '1080p30' | '720p60' | '1080p60'
@@ -65,8 +70,22 @@ const IDLE_SESSION_MS = 20_000
 const REBUILD_MS = 10_000
 // Yükleme hızı bu kadar süre art arda yetmezse yayıncı uyarılır (yayının ilk saniyelerindeki ısınma sayılmasın diye uzun).
 const UPLINK_WARN_MS = 20_000
+// Yayının ilk bu kadar süresi uyarıya sayılmaz: tarayıcı hız tahminini bu sürede yükseltir.
+const UPLINK_GRACE_MS = 30_000
+// Tarayıcının bu yayına ayırabildiği hız, seçilen kalitenin bu oranının altındaysa "internet yetmiyor" sayılır.
+// (Tarayıcı, hız bizim koyduğumuz üst sınıra dayandığında da "bant genişliği" der; o internetin suçu değil.)
+const UPLINK_LOW_RATIO = 0.6
+// Ekran paylaşımı bu hızla başlar (kbps); yoksa tarayıcı ~300 kbps'den başlayıp ilk ~20 sn 360p gönderiyor.
+const SCREEN_START_KBPS = 2500
 
-type Signal = { type: 'izle' | 'birak' | 'yayinda'; to: string; kind: VideoKind } | { type: 'bitti'; kind: VideoKind }
+// yayinda.yayin: yayının kimliği; yayıncı oturumunu baştan kurunca değişir, izleyen görüntüyü hemen yeniden çeker.
+// yayinda.ses: ekran paylaşımında ses var mı (yoksa izleyen ses izini hiç istemez).
+// izle.yok: Cloudflare yayını bulamadı ("iz yok"); bu tekrarlanırsa yayıncı oturumunu baştan kurar.
+type Signal =
+  | { type: 'izle'; to: string; kind: VideoKind; yok?: boolean }
+  | { type: 'yayinda'; to: string; kind: VideoKind; yayin?: string; ses?: boolean }
+  | { type: 'birak'; to: string; kind: VideoKind }
+  | { type: 'bitti'; kind: VideoKind }
 
 type Wiring = { me: string; channelId: string; send: (payload: unknown) => void; rtc: () => RTCConfiguration; onLocalChange: () => void }
 
@@ -80,11 +99,18 @@ let ticker: ReturnType<typeof setInterval> | undefined
 const watchers: Record<VideoKind, Set<string>> = { screen: new Set(), camera: new Set() }
 const publishing: Partial<Record<VideoKind, Promise<boolean>>> = {}
 const publishIdle: Partial<Record<VideoKind, ReturnType<typeof setTimeout>>> = {}
-// Benim izlediklerim: `${yayıncı}:${tür}` → çekilen izler, görüntü izinin mid'i, ondan kurulan akış ve paket sayacı.
-type Incoming = { mids: string[]; videoMid: string | null; stream: MediaStream; packets: number; changedAt: number }
+// Cloudflare'e gönderilen yayınımın kimliği (her gönderişte yenisi) ve ne zamandan beri gönderildiği.
+const publishIds: Partial<Record<VideoKind, string>> = {}
+let screenPublishedAt = 0
+// Benim izlediklerim: `${yayıncı}:${tür}` → çekilen izler, görüntü izinin mid'i, ondan kurulan akış, paket sayacı ve
+// yayının kimliği (yayıncı söylediyse).
+type Incoming = { mids: string[]; videoMid: string | null; stream: MediaStream; packets: number; changedAt: number; yayin?: string }
 const incoming = new Map<string, Incoming>()
-// İzlemek isteyip henüz görüntüsü gelmeyenler: bir sonraki istek zamanı ve kaçıncı deneme.
-const asks = new Map<string, { at: number; tries: number }>()
+// Yayıncının en son bildirdiği yayın kimliği ve ses bilgisi (izlenen her yayın için).
+const announced = new Map<string, { yayin?: string; ses?: boolean }>()
+// İzlemek isteyip henüz görüntüsü gelmeyenler: bir sonraki istek zamanı, kaçıncı deneme ve son çekişte Cloudflare'in
+// yayını bulamayıp bulamadığı.
+const asks = new Map<string, { at: number; tries: number; yok?: boolean }>()
 // Listeden düşenler (kişi → ilk görünmediği an). Bekleme süresi dolana kadar yayınları/izlemeleri sürer.
 const absent = new Map<string, number>()
 // Zaten izleyicim olan birinin art arda gelen "izle" istekleri: görüntüm ona ulaşmıyor demektir.
@@ -167,6 +193,7 @@ function rebuildSession(): void {
   }
   for (const kind of ['screen', 'camera'] as const) {
     delete publishing[kind]
+    delete publishIds[kind]
     if (watchers[kind].size) void serve(kind)
   }
 }
@@ -235,23 +262,36 @@ async function serve(kind: VideoKind): Promise<void> {
       })
     }
     if (audioName) for (const track of stream.getAudioTracks()) tracks.push({ track, name: audioName, encodings: [{ maxBitrate: 128_000 }] })
-    await s.publish(tracks)
+    await s.publish(tracks, kind === 'screen' ? Math.min(SCREEN_START_KBPS, screenBitrate / 1000) : undefined)
+    if (session !== s) return false
+    publishIds[kind] = Math.random().toString(36).slice(2, 12)
+    if (kind === 'screen') screenPublishedAt = Date.now()
     return true
   })().catch(() => false)
-  const ok = await publishing[kind]
+  const pending = publishing[kind]
+  const ok = await pending
   if (!ok) {
-    // Gönderilemedi (ör. kapanan izlerden sonra pazarlık tutmadı): oturum baştan kurulur, izleyici yeniden isteyince
-    // tekrar denenir. Cloudflare'e hiç ulaşılamıyorsa döngüye girmemek için en fazla REBUILD_MS'de bir.
+    // Gönderilemedi (ör. pazarlık yarım kaldı ya da istek zaman aşımına uğradı): oturum baştan kurulur, izleyici
+    // yeniden isteyince tekrar denenir. Cloudflare'e hiç ulaşılamıyorsa döngüye girmemek için en fazla REBUILD_MS'de bir.
+    // Bu arada oturum baştan kurulup yayın yeniden başlatıldıysa yenisine dokunulmaz.
+    if (publishing[kind] !== pending) return
     delete publishing[kind]
     if (session && Date.now() - lastRebuild > REBUILD_MS) {
       lastRebuild = Date.now()
       void session.end()
       session = null
       sessionDownSince = 0
+      // İzleyenin yeniden istemesini (4-20 sn) beklemeden temiz bir oturumla bir kez daha dene.
+      setTimeout(() => {
+        if (watchers[kind].size && localStream(kind) === stream && !publishing[kind]) void serve(kind)
+      }, 1000)
     }
     return
   }
-  for (const viewer of watchers[kind]) send({ type: 'yayinda', to: viewer, kind })
+  if (publishing[kind] !== pending) return
+  const yayin = publishIds[kind]
+  const ses = kind === 'screen' ? stream.getAudioTracks().length > 0 : undefined
+  for (const viewer of watchers[kind]) send({ type: 'yayinda', to: viewer, kind, yayin, ses })
 }
 
 // Son izleyen de bırakınca yayın bir süre sonra durur.
@@ -266,6 +306,7 @@ async function unpublish(kind: VideoKind): Promise<void> {
   const pending = publishing[kind]
   if (!pending) return
   delete publishing[kind]
+  delete publishIds[kind]
   await pending
   if (!session || session.isClosed) return
   if (!incoming.size && !publishing.screen && !publishing.camera) {
@@ -397,17 +438,23 @@ function resetUplink(): void {
   if (useVoice.getState().uplinkLimited) useVoice.setState({ uplinkLimited: false })
 }
 
-// Yayınımın görüntüsü internetim yüzünden kısılıyor mu? (Tarayıcı bunu "qualityLimitationReason" ile bildirir.)
+// Yayınımın görüntüsü internetim yüzünden kısılıyor mu? Tarayıcı kaliteyi düşürdüğünde "bant genişliği" der, ama bunu
+// hız bizim koyduğumuz üst sınıra dayandığında ve yayının ilk saniyelerindeki ısınmada da der (100 Mbit hatta bile
+// uyarı çıkıyordu). İnternetin suçu ancak tarayıcının bu yayına ayırabildiği hız (targetBitrate) seçilen kalitenin
+// belirgin biçimde altında kalıyorsa vardır.
 async function checkUplink(s: SfuSession): Promise<void> {
+  // Kameram da bu oturumdan gider; ekran paylaşmıyorsam uyarı gerekmez.
+  const mid = s.localMid('ekran')
+  if (!localStream('screen') || !publishing.screen || !mid) return resetUplink()
+  const now = Date.now()
+  if (now - screenPublishedAt < UPLINK_GRACE_MS) return
   const report = await s.pc.getStats().catch(() => null)
   if (!report) return
   let limited = false
-  report.forEach((r: { type: string; kind?: string; qualityLimitationReason?: string; bytesSent?: number }) => {
-    if (r.type === 'outbound-rtp' && r.kind === 'video' && r.qualityLimitationReason === 'bandwidth' && (r.bytesSent ?? 0) > 0) limited = true
+  report.forEach((r: { type: string; mid?: string; qualityLimitationReason?: string; targetBitrate?: number; bytesSent?: number }) => {
+    if (r.type !== 'outbound-rtp' || r.mid !== mid || !r.bytesSent) return
+    limited = r.qualityLimitationReason === 'bandwidth' && (r.targetBitrate ?? 0) < screenBitrate * UPLINK_LOW_RATIO
   })
-  // Kameram da bu oturumdan gider; ekran paylaşmıyorsam uyarı gerekmez.
-  if (!localStream('screen') || !publishing.screen) return resetUplink()
-  const now = Date.now()
   if (limited) {
     uplinkOkSince = 0
     uplinkLimitedSince ||= now
@@ -433,7 +480,7 @@ async function checkUplink(s: SfuSession): Promise<void> {
 function request(userId: string, kind: VideoKind): void {
   if (!wiring) return
   const key = videoKey(userId, kind)
-  send({ type: 'izle', to: userId, kind })
+  send(asks.get(key)?.yok ? { type: 'izle', to: userId, kind, yok: true } : { type: 'izle', to: userId, kind })
   const tries = (asks.get(key)?.tries ?? 0) + 1
   asks.set(key, { tries, at: Date.now() + Math.min(ASK_MAX_MS, ASK_FIRST_MS * 2 ** (tries - 1)) })
   ensureTicker()
@@ -446,8 +493,8 @@ export function watch(userId: string, kind: VideoKind): void {
   setRemote(key, null)
   asks.delete(key)
   request(userId, kind)
-  // Yayıncı hazırlanırken görüntü oturumum da açılsın; "yayinda" gelince hemen çekilir.
-  void ensureSession()
+  // Görüntü oturumu burada önceden açılmaz: Cloudflare bağlantısı kurulmamış oturumu 5-15 sn'de kapatıyor, yayın
+  // gecikirse boşuna açılıp ölüyordu. "yayinda" gelince çekerken açılır (~0,5 sn).
 }
 
 // Kanala girilirken "izle" denirse (kenar çubuğundaki "İzle", "yayın açtı" bildirimi) bağlantı kurulunca izlenir.
@@ -488,6 +535,7 @@ export function unwatch(userId: string, kind: VideoKind): void {
 
 function dropIncoming(key: string): void {
   asks.delete(key)
+  announced.delete(key)
   const entry = incoming.get(key)
   incoming.delete(key)
   if (session && !session.isClosed && !incoming.size && !publishing.screen && !publishing.camera) {
@@ -529,15 +577,22 @@ async function pullScreenAudio(from: string, entry: Incoming): Promise<void> {
 const pulling = new Set<string>()
 
 // Yayıncı "yayinda" dedi: görüntüyü Cloudflare'den çek. Görüntü zaten sağlıklı geliyorsa (tekrarlanan "izle"
-// isteklerine gelen fazladan cevaplar) dokunulmaz.
+// isteklerine gelen fazladan cevaplar) dokunulmaz; yayın değiştiyse (yayıncı oturumunu baştan kurdu, eski yayın
+// artık akmıyor) donmasını beklemeden hemen yeniden çekilir.
 async function pull(from: string, kind: VideoKind): Promise<void> {
   const key = videoKey(from, kind)
-  const current = incoming.get(key)
   if (pulling.has(key)) return
-  if (current?.videoMid && useVoice.getState().videos[key] && Date.now() - current.changedAt < STALL_MS) return
   pulling.add(key)
   try {
-    await pullNow(from, kind)
+    // Çekerken yayın yeniden değiştiyse bir kez daha çekilir. Çekilemediyse yeniden deneme bekçiye kalır.
+    for (let round = 0; round < 3; round++) {
+      const current = incoming.get(key)
+      const latest = announced.get(key)?.yayin
+      const fresh = current?.videoMid && useVoice.getState().videos[key] && Date.now() - current.changedAt < STALL_MS
+      if (fresh && (!latest || current.yayin === latest)) return
+      await pullNow(from, kind)
+      if (!incoming.get(key)?.videoMid || announced.get(key)?.yayin === latest) return
+    }
   } finally {
     pulling.delete(key)
   }
@@ -550,13 +605,18 @@ async function pullNow(from: string, kind: VideoKind): Promise<void> {
   if (!s || !(key in useVoice.getState().videos)) return
   const old = incoming.get(key)
   if (old?.mids.length) await s.drop(old.mids).catch(() => {})
-  const entry: Incoming = { mids: [], videoMid: null, stream: new MediaStream(), packets: 0, changedAt: Date.now() }
+  const info = announced.get(key)
+  const entry: Incoming = { mids: [], videoMid: null, stream: new MediaStream(), packets: 0, changedAt: Date.now(), yayin: info?.yayin }
   incoming.set(key, entry)
+  let missing = false
   try {
-    const results = await s.pull(trackNames(kind).map((name) => ({ user: from, name })))
+    // Yayıncı ekranında ses olmadığını söylediyse ses izi hiç istenmez (eski sürümler söylemez; o zaman denenir).
+    const names = trackNames(kind).filter((name) => !(name === 'ekran-ses' && info?.ses === false))
+    const results = await s.pull(names.map((name) => ({ user: from, name })))
     entry.mids = results.flatMap((r) => (r.mid ? [r.mid] : []))
     entry.videoMid = results.find((r) => r.mid && r.name !== 'ekran-ses')?.mid ?? null
     entry.changedAt = Date.now()
+    missing = results.some((r) => r.name !== 'ekran-ses' && r.error === 'not_found')
     // Görüntü izi yoksa (yayın tam o an bitti ya da henüz hazır değil) biraz sonra yeniden istenir.
     if (!entry.videoMid) throw new Error('görüntü yok')
     asks.delete(key)
@@ -572,8 +632,9 @@ async function pullNow(from: string, kind: VideoKind): Promise<void> {
     if (entry.mids.length) void s.drop(entry.mids).catch(() => {})
     incoming.delete(key)
     // Cloudflare yeni bir yayını ilk paketleri gelene kadar tanımayabiliyor: ilk denemeler sık, sonra seyrek.
+    // Bulamadığı söylenir; tekrarlanırsa yayıncı kendi oturumunu baştan kurar.
     const tries = (asks.get(key)?.tries ?? 0) + 1
-    asks.set(key, { tries, at: Date.now() + 3000 })
+    asks.set(key, { tries, at: Date.now() + 3000, yok: missing })
     if (tries <= 4) {
       setTimeout(() => {
         if (key in useVoice.getState().videos && !incoming.has(key)) void pull(from, kind)
@@ -658,7 +719,7 @@ async function tick(): Promise<void> {
   }
 }
 
-// true: bu izleyici son bir dakikada görüntüyü tekrar tekrar istedi.
+// true: Cloudflare bu izleyiciye son bir dakikada yayınımı tekrar tekrar bulamadı.
 function noteReask(viewer: string): boolean {
   const now = Date.now()
   const entry = reasks.get(viewer)
@@ -699,8 +760,10 @@ export async function onVideoSignal(from: string, payload: unknown): Promise<voi
         if (!watchers[kind].has(from)) {
           watchers[kind].add(from)
           watchersChanged(kind)
-        } else if (publishing[kind] && noteReask(from)) {
-          // Görüntüm izleyiciye defalarca ulaşmadı: oturumu baştan kur (izlenen yayınlar yeniden gönderilir).
+        } else if (publishing[kind] && message.yok === true && noteReask(from)) {
+          // Cloudflare yayınımı izleyiciye defalarca "yok" dedi: Cloudflare'deki yayınım bozulmuş, oturumu baştan kur
+          // (izlenen yayınlar yeniden gönderilir, izleyenler yeni yayını hemen çeker). Başka nedenle tekrarlanan
+          // istekler (izleyicinin kendi bağlantısı, eski sürümler) yayını herkes için koparmasın diye sayılmaz.
           rebuildSession()
           break
         }
@@ -711,9 +774,17 @@ export async function onVideoSignal(from: string, payload: unknown): Promise<voi
         if (watchers[kind].delete(from)) watchersChanged(kind)
         releaseIfUnwatched(kind)
         break
-      case 'yayinda':
+      case 'yayinda': {
+        const key = videoKey(from, kind)
+        if (!(key in useVoice.getState().videos)) return
+        const { yayin, ses } = message as { yayin?: unknown; ses?: unknown }
+        announced.set(key, {
+          yayin: typeof yayin === 'string' && yayin.length <= 64 ? yayin : undefined,
+          ses: typeof ses === 'boolean' ? ses : undefined,
+        })
         await pull(from, kind)
         break
+      }
       case 'bitti':
         if (videoKey(from, kind) in useVoice.getState().videos) dropIncoming(videoKey(from, kind))
         break
@@ -762,6 +833,7 @@ export function stopVideo(): void {
   stopLocal('screen', false)
   stopLocal('camera', false)
   asks.clear()
+  announced.clear()
   absent.clear()
   reasks.clear()
   clearInterval(ticker)
@@ -769,6 +841,7 @@ export function stopVideo(): void {
   for (const kind of ['screen', 'camera'] as const) {
     clearTimeout(publishIdle[kind])
     delete publishing[kind]
+    delete publishIds[kind]
     watchers[kind].clear()
   }
   clearTimeout(sessionIdle)

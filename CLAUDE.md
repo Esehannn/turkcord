@@ -44,6 +44,11 @@ Arayüz metinleri, kod yorumları ve commit mesajları Türkçe.
 - Bir SFU oturumunda bir iz kapatıldıktan (`closeMids`) sonra Cloudflare'in teklifini tarayıcı reddedebiliyor
   (max-bundle, grubun başındaki iz kapalı); reddedilince oturum cevap bekler hâlde kilitlenir. Pazarlık yarım kalırsa
   oturum `broken` olur ve baştan kurulur; görüntü oturumu da başka iz kalmayınca izleri kapatmak yerine kapanır.
+- Cloudflare bağlantısı kurulmamış (henüz iz alışverişi olmamış) bir oturumu 5-15 sn'de kapatır (`session_gone`):
+  oturumu ancak hemen kullanacaksan aç. `session_gone`/`not_found` ve istek zaman aşımı (`sfu.ts`, 15 sn) oturumu
+  `broken` yapar.
+- "İnternetin yetmiyor" uyarısı `qualityLimitationReason`'a tek başına bakmaz (tarayıcı bizim koyduğumuz üst sınıra
+  dayanınca da "bandwidth" der); `targetBitrate` seçilen kalitenin belirgin altında kalmalı (`video.ts` `checkUplink`).
 - Görüntü (ekran paylaşımı, kamera) ses oturumundan geçmez: `voice/video.ts` ayrı bir SFU oturumu açar, yalnızca biri
   izlerken ya da yayınlarken. Ses oturumunu görüntü için yeniden pazarlık ettirme. Yayıncı ancak biri "izle" deyince
   gönderir. Görüntü yalnızca onu gösteren ekran açıkken izlenir (`useCameraFeeds`, "İzle" düğmesi). İzlenmek istenen

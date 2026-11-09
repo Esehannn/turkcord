@@ -64,6 +64,29 @@ test('bağlantı ayarı Cloudflare aktarmasını yedek olarak ekler', () => {
 })
 
 
+test('görüntü kodeklerine başlangıç hızı yazılır; ses, rtx ve eski değer dokunulmaz/yenilenir', async () => {
+  const { startBitrate } = await import('../src/renderer/src/voice/sdp.ts')
+  const sdp = [
+    'v=0',
+    'm=video 9 UDP/TLS/RTP/SAVPF 96 97 98',
+    'a=rtpmap:96 VP8/90000',
+    'a=rtpmap:97 rtx/90000',
+    'a=fmtp:97 apt=96',
+    'a=rtpmap:98 H264/90000',
+    'a=fmtp:98 packetization-mode=1;x-google-start-bitrate=100',
+    'm=audio 9 UDP/TLS/RTP/SAVPF 111',
+    'a=rtpmap:111 opus/48000/2',
+    'a=fmtp:111 minptime=10',
+    '',
+  ].join('\r\n')
+  const lines = startBitrate(sdp, 3000).split('\r\n')
+  assert.equal(lines[lines.indexOf('a=rtpmap:96 VP8/90000') + 1], 'a=fmtp:96 x-google-start-bitrate=3000')
+  assert.ok(lines.includes('a=fmtp:97 apt=96'))
+  assert.ok(lines.includes('a=fmtp:98 packetization-mode=1;x-google-start-bitrate=3000'))
+  assert.ok(lines.includes('a=fmtp:111 minptime=10'))
+  assert.equal(lines.length, sdp.split('\r\n').length + 1)
+})
+
 test('Cloudflare teklifinde BUNDLE grubu yoksa açık bölümlerle eklenir', async () => {
   const { fixOffer } = await import('../src/renderer/src/voice/sdp.ts')
   const offer = ['v=0', 's=-', 'm=video 0 X 96', 'a=mid:0', 'm=video 9 X 96', 'a=mid:1', 'm=audio 9 X 111', 'a=mid:2', ''].join('\r\n')
